@@ -1,0 +1,49 @@
+project:
+  name: "Real-time Airfare Price Index"
+  problem_statement: "SIH 26056"
+  status: "prototype"
+
+index:
+  base_value: 100.0
+  base_date: "2026-09-04"
+  representative_fare_method: "median"
+  route_weighting: "equal"
+  lead_time_weighting: "equal"
+
+advance_windows:
+  - 1
+  - 7
+  - 15
+  - 30
+  - 45
+
+coverage:
+  require_complete_routes: true
+  require_complete_strata: true
+  minimum_route_coverage_ratio: 1.0
+  minimum_stratum_coverage_ratio: 1.0
+
+route_universe:
+  - AMD_DEL
+  - BLR_BOM
+  - BLR_DEL
+  - BLR_HYD
+  - BOM_BLR
+  - BOM_DEL
+  - BOM_GOI
+  - BOM_MAA
+  - CCU_DEL
+  - DEL_AMD
+  - DEL_BLR
+  - DEL_BOM
+  - DEL_CCU
+  - DEL_GOI
+  - DEL_HYD
+  - DEL_MAA
+  - HYD_BLR
+  - HYD_DEL
+  - MAA_BOM
+  - MAA_DEL
+
+weights:
+  official_weights_used: false
