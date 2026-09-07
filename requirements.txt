@@ -1,0 +1,35 @@
+# Core data processing
+
+pandas
+numpy
+pyarrow
+
+# Configuration
+
+PyYAML
+python-dateutil
+
+# Dashboard
+
+streamlit
+plotly
+
+# API / HTTP
+
+requests
+httpx
+
+# Data validation / schemas
+
+pydantic
+pandera
+
+# Retry / environment utilities
+
+tenacity
+python-dotenv
+
+# Testing
+
+pytest
+

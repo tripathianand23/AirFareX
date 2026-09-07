@@ -1,0 +1,8 @@
+metric,value
+observations,65.0
+correlation,0.9986703996740636
+mae,0.28151643085128497
+rmse,0.3084830749704202
+mean_absolute_difference,0.28151643085128497
+mean_relative_difference_pct,0.2809787792836044
+max_absolute_difference,0.644853689449306

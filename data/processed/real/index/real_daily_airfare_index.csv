@@ -1,0 +1,6 @@
+collection_date,national_index,routes_present,total_observations,expected_routes,route_coverage_ratio,lead_windows_present,expected_lead_windows,lead_time_coverage_ratio,observed_strata,required_strata,stratum_coverage_ratio,missing_routes,missing_lead_windows,coverage_complete,coverage_status,index_status
+2026-09-02,,1,1405,20,0.05,5,5,1.0,5,100,0.05,"AMD_DEL,BLR_BOM,BLR_DEL,BLR_HYD,BOM_BLR,BOM_DEL,BOM_GOI,BOM_MAA,CCU_DEL,DEL_AMD,DEL_BLR,DEL_CCU,DEL_GOI,DEL_HYD,DEL_MAA,HYD_BLR,HYD_DEL,MAA_BOM,MAA_DEL",,False,INSUFFICIENT_COVERAGE,INSUFFICIENT_COVERAGE
+2026-09-03,,1,373,20,0.05,5,5,1.0,5,100,0.05,"AMD_DEL,BLR_BOM,BLR_DEL,BLR_HYD,BOM_BLR,BOM_DEL,BOM_GOI,BOM_MAA,CCU_DEL,DEL_AMD,DEL_BLR,DEL_CCU,DEL_GOI,DEL_HYD,DEL_MAA,HYD_BLR,HYD_DEL,MAA_BOM,MAA_DEL",,False,INSUFFICIENT_COVERAGE,INSUFFICIENT_COVERAGE
+2026-09-04,100.0,20,6998,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS,VALID
+2026-09-05,114.67195171879092,20,6420,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS,VALID
+2026-09-06,90.42670590206218,20,7122,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS,VALID
