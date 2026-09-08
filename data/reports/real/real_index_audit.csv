@@ -3,4 +3,6 @@ collection_date,observations,routes_present,expected_routes,observed_strata,requ
 2026-09-03,373,1,20,5,100,False,True,False,True,False,False,True,,,HOLD,"('coverage', 'index_calculation', 'contribution_reconciliation')","('validated_duplicate_flags_present_before_deduplication',)"
 2026-09-04,6998,20,20,100,100,True,True,False,True,True,True,True,100.0,0.0,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
 2026-09-05,6420,20,20,100,100,True,True,False,True,True,True,True,114.67195171879092,14.671951718790922,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-06,7122,20,20,100,100,True,True,True,True,True,True,True,90.42670590206218,-9.573294097937818,PUBLISHABLE,(),()
+2026-09-06,7254,20,20,100,100,True,False,False,True,True,True,True,90.48565049301665,-9.51434950698335,HOLD,"('structural_validation',)","('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-07,5867,20,20,100,100,True,False,False,True,True,True,True,52.927057065179625,-47.072942934820375,HOLD,"('structural_validation',)","('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-08,2976,20,20,100,100,True,False,False,True,True,True,True,54.78028637308526,-45.21971362691474,HOLD,"('structural_validation',)","('validated_duplicate_flags_present_before_deduplication',)"
