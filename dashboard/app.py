@@ -67,12 +67,27 @@ from dashboard.monitoring import (
 )
 
 
+def display_chart_data_table(title, df, column_map=None, round_digits=2):
+    """Render a compact, user-facing data table directly below a chart."""
+    if df is None or df.empty:
+        return
+    table = df.copy()
+    if column_map:
+        table = table.rename(columns=column_map)
+    numeric_cols = table.select_dtypes(include="number").columns
+    if len(numeric_cols):
+        table[numeric_cols] = table[numeric_cols].round(round_digits)
+    st.markdown(f"#### {title}")
+    st.dataframe(table, use_container_width=True, hide_index=True)
+
+
+
 # ============================================================
 # CONFIG
 # ============================================================
 
 st.set_page_config(
-    page_title="Real-time Airfare Price Index",
+    page_title="AirfareX",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -115,6 +130,18 @@ st.markdown(
         padding-top:1.5rem;
     }
 
+    .sidebar-brand {
+        display:flex;
+        align-items:center;
+        gap:.45rem;
+        font-size:1.18rem;
+        line-height:1.2;
+        font-weight:800;
+        color:#16243a;
+        padding:.25rem 0 .7rem 0;
+        white-space:nowrap;
+    }
+
     .block-container {
         max-width:1500px;
         padding-top:1.0rem;
@@ -127,7 +154,9 @@ st.markdown(
         min-height:150px;
         display:flex;
         flex-direction:column;
+        align-items:center;
         justify-content:center;
+        text-align:center;
         padding:1.7rem 2rem;
         margin:0 0 1.1rem 0;
         border-radius:0 0 14px 14px;
@@ -142,27 +171,14 @@ st.markdown(
         background-position:center 58%;
     }
 
-    .hero .eyebrow {
-        font-size:.72rem;
-        font-weight:700;
-        letter-spacing:.14em;
-        text-transform:uppercase;
-        opacity:.78;
-        margin-bottom:.28rem;
-    }
-
     .hero h1 {
-        margin:.05rem 0 .25rem 0;
-        font-size:2rem;
-        line-height:1.12;
-        letter-spacing:-.02em;
-    }
-
-    .hero p {
-        max-width:780px;
         margin:0;
-        font-size:.92rem;
-        opacity:.86;
+        font-size:3.25rem;
+        line-height:1.08;
+        letter-spacing:-.035em;
+        text-align:center;
+        width:100%;
+        font-weight:800;
     }
 
     .badge {
@@ -192,9 +208,9 @@ st.markdown(
     /* Reference-style KPI cards */
     .judge-strip {
         display:grid;
-        grid-template-columns:repeat(5,minmax(0,1fr));
+        grid-template-columns:repeat(4,minmax(0,1fr));
         gap:.7rem;
-        margin:.25rem 0 1rem 0;
+        margin:.15rem 0 1rem 0;
     }
 
     .judge-card {
@@ -249,8 +265,15 @@ st.markdown(
         border-radius:8px;
         background:#edf5fc;
         color:#3d5268;
-        margin:.45rem 0 1rem 0;
+        margin:.8rem 0 1rem 0;
         font-size:.82rem;
+    }
+
+    .movement-callout {
+        font-size:1.02rem;
+        font-weight:600;
+        line-height:1.5;
+        padding:.9rem 1.05rem;
     }
 
     .gate {
@@ -268,10 +291,39 @@ st.markdown(
         border-radius:11px;
         padding:.72rem .85rem;
         box-shadow:0 2px 8px rgba(20,38,60,.035);
+        min-height:92px;
+        box-sizing:border-box;
     }
 
-    [data-testid="stMetricLabel"] { color:#69778a; }
-    [data-testid="stMetricValue"] { color:#16243a; }
+    [data-testid="stMetricLabel"] {
+        color:#69778a;
+        font-size:.78rem;
+    }
+
+    [data-testid="stMetricValue"] {
+        color:#16243a;
+        font-size:1.85rem;
+        line-height:1.1;
+    }
+
+    /* Keep the Latest Index card aligned with the other KPI cards.
+       Its movement value is shown compactly on the right side. */
+    [data-testid="column"]:first-child [data-testid="stMetric"] {
+        position:relative;
+        padding-right:5.8rem;
+    }
+
+    [data-testid="column"]:first-child [data-testid="stMetricDelta"] {
+        position:absolute;
+        right:.75rem;
+        top:50%;
+        transform:translateY(-50%);
+        margin:0;
+        font-size:.82rem;
+        line-height:1.15;
+        white-space:nowrap;
+        text-align:right;
+    }
 
     /* Inputs */
     [data-testid="stSidebar"] label {
@@ -304,7 +356,7 @@ st.markdown(
 
     @media (max-width:1100px) {
         .judge-strip { grid-template-columns:repeat(2,1fr); }
-        .hero h1 { font-size:1.55rem; }
+        .hero h1 { font-size:2rem; }
     }
 
     @media (max-width:700px) {
@@ -804,10 +856,8 @@ def metadata_value(*keys, default="—"):
 # SIDEBAR
 # ============================================================
 
-st.sidebar.title("✈️ Airfare Index")
-st.sidebar.caption("REAL-DATA statistical monitoring")
 st.sidebar.markdown(
-    '<span class="real-badge">● REAL SCRAPED DATA</span>',
+    '<div class="sidebar-brand">✈️ <span>Airfare Index</span></div>',
     unsafe_allow_html=True,
 )
 st.sidebar.divider()
@@ -967,16 +1017,9 @@ if selected_sources and "source" in filtered_clean.columns:
 # ============================================================
 
 st.markdown(
-    f"""
+    """
     <div class="hero">
-        <div class="eyebrow">Official-style statistical monitoring • SIH 2026</div>
-        <h1>AirfareX - Real-time Airfare Price Index</h1>
-        <p>Real-time airfare measurement, statistical index monitoring and data-quality intelligence for India.</p>
-        <div>
-            <span class="badge">REAL SCRAPED DATA</span>
-            <span class="badge">STATISTICAL INDEX</span>
-            <span class="badge">AUDIT CONTROLLED</span>
-        </div>
+        <h1>AirfareX</h1>
     </div>
     """,
     unsafe_allow_html=True,
@@ -984,12 +1027,8 @@ st.markdown(
 
 latest_audit = audit_latest_status()
 
-publication_status = str(
-    latest_audit.get(
-        "publication_status",
-        "UNKNOWN",
-    )
-).upper()
+# Publication status is taken directly from the latest audit record.
+publication_status = str(latest_audit.get("publication_status", "UNKNOWN")).strip().upper()
 
 latest_idx_value = (
     pd.to_numeric(
@@ -1049,43 +1088,10 @@ st.markdown(
             <div class="label">Lead windows</div>
             <div class="value">{len(expected_windows) if expected_windows else 5}</div>
         </div>
-        <div class="judge-card">
-            <div class="label">Publication gate</div>
-            <div class="value">{publication_status}</div>
-        </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
-
-render_status_chip(
-    "MODE",
-    "REAL SCRAPED DATA",
-    "good",
-)
-
-render_status_chip(
-    "INDEX",
-    "PRECOMPUTED STATISTICAL SERIES",
-    "good",
-)
-
-render_status_chip(
-    "AUDIT",
-    publication_status,
-    "good" if publication_status == "PUBLISHABLE" else "warn",
-)
-
-st.markdown(
-    '<div class="callout">'
-    '<b>Statistical integrity rule:</b> the headline index shown here is '
-    'read from the statistical engine output. Exploratory filters can change '
-    'diagnostic charts and observation counts, but they cannot silently '
-    'recalculate or redefine the published headline series.'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
 
 # ============================================================
 # NAVIGATION
@@ -1185,9 +1191,8 @@ with pages[0]:
         )
 
         st.markdown(
-            f'<div class="callout"><b>Base = 100</b> · Latest movement {format_change(period_change_value)} · '
-            f'7-day movement {format_change(change_7d)} · 30-day movement {format_change(change_30d)} · '
-            f'Publication status: <b>{publication_status}</b></div>',
+            f'<div class="callout movement-callout"><b>Base = 100</b> · Latest movement {format_change(period_change_value)} · '
+            f'7-day movement {format_change(change_7d)} · 30-day movement {format_change(change_30d)}</div>',
             unsafe_allow_html=True,
         )
 
@@ -1212,6 +1217,15 @@ with pages[0]:
             use_container_width=True,
             key="overview_index_chart",
         )
+
+        overall_table = filtered_daily.copy()
+        keep = [c for c in ["collection_date", "overall_airfare_index"] if c in overall_table.columns]
+        if keep:
+            display_chart_data_table(
+                "Index Data",
+                overall_table[keep].tail(30),
+                {"collection_date": "Collection Date", "overall_airfare_index": "Airfare Index"},
+            )
 
         # --------------------------------------------------------
         # Secondary analytical panels
@@ -1261,6 +1275,11 @@ with pages[0]:
                     use_container_width=True,
                     key="overview_route_pulse",
                 )
+                display_chart_data_table(
+                    "Route Movement Data",
+                    top[[c for c in ["route", "latest_index", "change_pct", "observed_days"] if c in top.columns]],
+                    {"route": "Route", "latest_index": "Latest Index", "change_pct": "Period Change (%)", "observed_days": "Observed Days"},
+                )
             else:
                 st.info("Insufficient route history for movement analysis.")
 
@@ -1286,6 +1305,14 @@ with pages[0]:
                     use_container_width=True,
                     key="overview_lead_time_chart",
                 )
+                lead_table = filtered_advance.copy()
+                keep = [c for c in ["collection_date", "advance_days", "airfare_index"] if c in lead_table.columns]
+                if keep:
+                    display_chart_data_table(
+                        "Lead-Time Index Data",
+                        lead_table[keep].tail(30),
+                        {"collection_date": "Collection Date", "advance_days": "Advance Days", "airfare_index": "Airfare Index"},
+                    )
 
         # --------------------------------------------------------
         # Source coverage + data quality
@@ -1333,6 +1360,13 @@ with pages[0]:
                     use_container_width=True,
                     key="overview_source_coverage",
                 )
+                source_table = source_df.copy()
+                source_table["share_pct"] = source_table["observations"] / source_table["observations"].sum() * 100
+                display_chart_data_table(
+                    "Source Coverage Data",
+                    source_table[["source", "observations", "share_pct"]],
+                    {"source": "Source", "observations": "Observations", "share_pct": "Share (%)"},
+                )
             else:
                 st.info("No source observations available for the selected filters.")
 
@@ -1371,6 +1405,24 @@ with pages[0]:
                 use_container_width=True,
                 key="overview_quality_gauge",
             )
+            quality_table = pd.DataFrame([
+                {
+                    "Metric": "Valid observations",
+                    "Value": f"{quality_score:.2f}%",
+                    "Description": "100% minus missing-fare and duplicate rates",
+                },
+                {
+                    "Metric": "Missing fare",
+                    "Value": f"{float(quality.get('missing_fare_pct', 0) or 0):.2f}%",
+                    "Description": "Share of observations without a valid fare",
+                },
+                {
+                    "Metric": "Duplicate rate",
+                    "Value": f"{float(quality.get('duplicate_pct', 0) or 0):.2f}%",
+                    "Description": "Share identified as duplicate observations",
+                },
+            ])
+            display_chart_data_table("Data Quality Data", quality_table)
 
             qa1, qa2, qa3 = st.columns(3)
             qa1.metric(
@@ -1386,11 +1438,6 @@ with pages[0]:
                 f"{quality_score:.1f}%",
             )
 
-        st.markdown(
-            '<div class="section-note">Dashboard filters affect exploratory observations and diagnostics. '
-            'The headline statistical index remains the precomputed series produced by the statistical engine.</div>',
-            unsafe_allow_html=True,
-        )
 
 
 # ============================================================
@@ -1418,6 +1465,11 @@ with pages[1]:
             use_container_width=True,
             key="analytics_index_chart",
         )
+
+        overall_analytics_table = filtered_daily.copy()
+        keep = [c for c in ["collection_date", "overall_airfare_index"] if c in overall_analytics_table.columns]
+        if keep:
+            display_chart_data_table("Index Analytics Data", overall_analytics_table[keep].tail(30), {"collection_date": "Collection Date", "overall_airfare_index": "Airfare Index"})
 
         weekly = weekly_index(
             filtered_daily
@@ -1543,6 +1595,11 @@ with pages[2]:
             key="route_index_chart",
         )
 
+        route_chart_table = filtered_routes.copy()
+        keep = [c for c in ["collection_date", "route", "airfare_index"] if c in route_chart_table.columns]
+        if keep:
+            display_chart_data_table("Route Index Data", route_chart_table[keep].tail(50), {"collection_date": "Collection Date", "route": "Route", "airfare_index": "Route Index"})
+
         if not movement_table.empty:
             st.subheader("Route Movement Ranking")
 
@@ -1613,6 +1670,9 @@ with pages[2]:
                 key="route_lead_heatmap",
             )
 
+            heatmap_table = heatmap_data.reset_index()
+            display_chart_data_table("Route × Lead-Time Fare Data", heatmap_table)
+
             st.caption(
                 "Exploratory median fare matrix. It is not a second "
                 "national-index calculation."
@@ -1663,6 +1723,11 @@ with pages[3]:
             use_container_width=True,
             key="lead_time_chart",
         )
+
+        lead_chart_table = filtered_advance.copy()
+        keep = [c for c in ["collection_date", "advance_days", "airfare_index"] if c in lead_chart_table.columns]
+        if keep:
+            display_chart_data_table("Lead-Time Chart Data", lead_chart_table.tail(50)[keep], {"collection_date": "Collection Date", "advance_days": "Advance Days", "airfare_index": "Airfare Index"})
 
         if {
             "advance_days",
@@ -2209,6 +2274,12 @@ with pages[5]:
                 key="source_share_chart",
             )
 
+            display_chart_data_table(
+                "Observation Share Data",
+                source_df[["source", "observations", "share_pct"]],
+                {"source": "Source", "observations": "Observations", "share_pct": "Share (%)"},
+            )
+
         with right:
             st.markdown(
                 "#### Source Concentration Signal"
@@ -2284,6 +2355,9 @@ with pages[5]:
                     use_container_width=True,
                     key="source_route_heatmap",
                 )
+
+                coverage_table = matrix.reset_index()
+                display_chart_data_table("Source × Route Coverage Data", coverage_table)
 
         source_coverage = (
             calculate_source_coverage(
