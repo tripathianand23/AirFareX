@@ -120,7 +120,6 @@ def validate_fares(df: pd.DataFrame) -> pd.DataFrame:
         "destination",
         "travel_date",
         "airline",
-        "departure_time",
         "flight_number",
         "fare_class",
         "advance_days",
@@ -128,12 +127,6 @@ def validate_fares(df: pd.DataFrame) -> pd.DataFrame:
         "taxes",
         "fees",
         "total_fare",
-    ]
-
-    duplicate_columns = [
-        column
-        for column in duplicate_columns
-        if column in result.columns
     ]
 
     result["duplicate_observation"] = result.duplicated(
