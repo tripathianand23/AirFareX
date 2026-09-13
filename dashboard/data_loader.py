@@ -203,9 +203,7 @@ def load_raw_observations() -> pd.DataFrame:
     to the source dataset.
     """
     if not RAW_JSON_PATH.exists():
-        raise FileNotFoundError(
-            f"Raw airfare dataset not found:\n{RAW_JSON_PATH}"
-        )
+        return pd.DataFrame()
 
     try:
         with RAW_JSON_PATH.open("r", encoding="utf-8") as file:
