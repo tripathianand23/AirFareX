@@ -19,6 +19,7 @@ DUPLICATE_COLUMNS = [
     "destination",
     "travel_date",
     "airline",
+    "departure_time",
     "flight_number",
     "fare_class",
     "advance_days",
@@ -65,8 +66,14 @@ def clean_airfare_data(df: pd.DataFrame) -> pd.DataFrame:
     # ---------------------------------------------------------
     # 2. Remove exact duplicate observations
     # ---------------------------------------------------------
+    duplicate_columns = [
+        column
+        for column in DUPLICATE_COLUMNS
+        if column in clean_df.columns
+    ]
+
     clean_df = clean_df.drop_duplicates(
-        subset=DUPLICATE_COLUMNS,
+        subset=duplicate_columns,
         keep="first",
     )
 

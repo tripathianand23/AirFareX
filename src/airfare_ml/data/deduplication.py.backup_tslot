@@ -15,7 +15,7 @@ BASE_DEDUPLICATION_COLUMNS = [
     "destination",
     "travel_date",
     "airline",
-    "departure_time",
+    "departure_time"
     "advance_days",
     "base_fare",
     "taxes",
@@ -80,7 +80,6 @@ def build_deduplication_key(
         "origin",
         "destination",
         "airline",
-        "departure_time",
         "currency",
     ]:
         if column in normalized.columns:

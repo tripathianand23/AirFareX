@@ -205,8 +205,11 @@ class RealAirfareJsonAdapter:
                     ).strip(),
 
                     "flight_number": None,
-                    "departure_time": None,
-                    "arrival_time": None,
+                    "departure_time": str(row.get("departure_time")).strip()
+                        if row.get("departure_time") is not None
+                            and str(row.get("departure_time")).strip()
+                        else None,
+                    "arrival_time":None,
                     "fare_class": None,
                     "cabin": None,
                     "stops": None,

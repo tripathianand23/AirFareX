@@ -36,3 +36,4 @@ data/processed/real/clean_airfare_observations.csv
 # Local backup scripts
 scripts/*.fixed_base_backup.py
 src/airfare_ml/index/*.fixed_base_backup.py
+data/raw/airfare_index.json

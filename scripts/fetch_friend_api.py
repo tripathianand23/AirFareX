@@ -62,10 +62,15 @@ def record_key(record):
         str(record.get("airline", "")),
         str(record.get("route", "")),
         str(record.get("advance_window_days", "")),
+        str(record.get("departure_time", "")),
         str(record.get("base_fare", "")),
         str(record.get("taxes_fees", "")),
         str(record.get("total_fare", "")),
         str(record.get("ota_source", "")),
+        str(record.get("departure_time", "")),
+str(record.get("flight_number", "")),
+str(record.get("arrival_time", "")),
+str(record.get("travel_date", ""))
     )
 
 
