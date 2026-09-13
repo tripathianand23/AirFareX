@@ -1,8 +1,38 @@
-.venv/
-.env
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+
+# Virtual environments
 .venv/
+venv/
+env/
+myenv/
+
+# Environment / secrets
 .env
-__pycache__/
-*.pyc
+.env.*
+
+# macOS
+.DS_Store
+
+# Local database / runtime artifacts
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Raw historical API data
+data/raw/airfare_index.json
+data/raw/*.json.before_json_fix
+data/raw/*recovered*.json
+
+# Large intermediate processing data
+data/processed/real/normalized/
+data/processed/real/validated/
+data/processed/real/deduplicated/
+data/processed/real/clean_airfare_observations.csv
+
+# Local backup scripts
+scripts/*.fixed_base_backup.py
+src/airfare_ml/index/*.fixed_base_backup.py

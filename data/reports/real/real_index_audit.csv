@@ -1,8 +1,13 @@
 collection_date,observations,routes_present,expected_routes,observed_strata,required_strata,coverage_complete,structural_validation_pass,duplicate_qc_pass,representative_fares_pass,index_calculation_pass,contribution_reconciliation_pass,base_period_pass,national_index,movement_from_base_pct,publication_status,failed_checks,warnings
-2026-09-02,1405,1,20,5,100,False,True,False,True,False,False,True,,,HOLD,"('coverage', 'index_calculation', 'contribution_reconciliation')","('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-03,373,1,20,5,100,False,True,False,True,False,False,True,,,HOLD,"('coverage', 'index_calculation', 'contribution_reconciliation')","('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-04,6998,20,20,100,100,True,True,False,True,True,True,True,100.0,0.0,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-05,6420,20,20,100,100,True,True,False,True,True,True,True,114.67195171879092,14.671951718790922,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-06,7254,20,20,100,100,True,False,False,True,True,True,True,90.48565049301665,-9.51434950698335,HOLD,"('structural_validation',)","('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-07,5867,20,20,100,100,True,False,False,True,True,True,True,52.927057065179625,-47.072942934820375,HOLD,"('structural_validation',)","('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-08,2976,20,20,100,100,True,False,False,True,True,True,True,54.78028637308526,-45.21971362691474,HOLD,"('structural_validation',)","('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-02,1405,1,20,5,100,False,True,True,True,False,True,False,,,HOLD,"('coverage', 'index_calculation', 'base_period')","('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-03,373,1,20,5,100,False,True,True,True,False,True,False,,,HOLD,"('coverage', 'index_calculation', 'base_period')","('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-04,6998,20,20,100,100,True,True,True,True,True,True,True,100.0,,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-05,6420,20,20,100,100,True,True,True,True,True,True,True,103.37006586209331,3.3700658620932984,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-06,7254,20,20,100,100,True,True,True,True,True,True,True,93.857336361262,-9.202595956088786,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-07,5867,20,20,100,100,True,True,True,True,True,True,True,73.57857620979108,-21.60594039598233,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-08,2976,20,20,100,100,True,True,True,True,True,True,True,74.6985204178372,1.5221063871266978,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-09,3118,20,20,100,100,True,True,True,True,True,True,True,75.57666321329143,1.1755825825494242,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-10,4015,20,20,100,100,True,True,True,True,True,True,True,79.31877146585785,4.951407079200479,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-11,3632,20,20,100,100,True,True,True,True,True,True,True,77.074336305422,-2.8296393387811776,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-12,3599,20,20,100,100,True,True,True,True,True,True,True,74.64618097590507,-3.1504070562409936,PUBLISHABLE,(),()
+2026-09-13,3740,20,20,100,100,True,True,True,True,True,True,True,74.56425845590275,-0.10974777132773283,PUBLISHABLE,(),()

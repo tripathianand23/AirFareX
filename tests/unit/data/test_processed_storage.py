@@ -23,7 +23,9 @@ def sample_observations() -> pd.DataFrame:
             "destination": ["BOM", "BOM"],
             "travel_date": ["2026-09-10", "2026-09-10"],
             "airline": ["AI", "6E"],
+            "flight_number": ["AI101", "6E201"],
             "advance_days": [6, 6],
+            "base_fare": [4500.0, 4700.0],
             "total_fare": [5000.0, 5200.0],
             "currency": ["INR", "INR"],
             "ingestion_timestamp": [
