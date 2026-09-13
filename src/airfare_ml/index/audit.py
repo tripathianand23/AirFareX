@@ -356,7 +356,15 @@ def audit_date(
         == pd.Timestamp(collection_date).date()
     ].copy() if "collection_date" in lead_time_contributions.columns else pd.DataFrame()
 
-    contribution_reconciliation_pass = False
+    # Contribution reconciliation is not applicable to the
+    # first/base observation because there is no previous period.
+    contribution_reconciliation_pass = (
+        national is not None
+        and (
+            national.get("previous_collection_date") is None
+            or pd.isna(national.get("previous_collection_date"))
+        )
+    )
     movement_from_base_pct = None
 
     if (

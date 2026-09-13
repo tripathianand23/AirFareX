@@ -53,6 +53,10 @@ def _fixtures():
                 ["2026-09-04", "2026-09-05"]
             ),
             "national_index": [100.0, 116.126067],
+            "national_link_index": [float("nan"), 116.126067],
+            "previous_collection_date": pd.to_datetime(
+                [None, "2026-09-04"]
+            ),
             "index_status": ["VALID", "VALID"],
         }
     )
@@ -70,6 +74,19 @@ def _fixtures():
         }
     )
 
+    cleaned = pd.DataFrame(
+        {
+            "collection_timestamp": pd.to_datetime(
+                ["2026-09-04 10:00:00", "2026-09-05 10:00:00"]
+            ),
+            "invalid_fare": [False, False],
+            "missing_required_value": [False, False],
+            "invalid_route": [False, False],
+            "invalid_advance_window": [False, False],
+            "invalid_date_relationship": [False, False],
+        }
+    )
+
     lead = pd.DataFrame(
         {
             "collection_date": pd.to_datetime(
@@ -83,6 +100,7 @@ def _fixtures():
     return (
         validated,
         deduplicated,
+        cleaned,
         representative,
         stratum_indices,
         national_indices,
@@ -96,11 +114,12 @@ def test_publishable_date_passes_all_gates():
     report = audit_all_dates(
         validated=args[0],
         deduplicated=args[1],
-        representative=args[2],
-        stratum_indices=args[3],
-        national_indices=args[4],
-        coverage_report=args[5],
-        lead_time_contributions=args[6],
+        cleaned=args[2],
+        representative=args[3],
+        stratum_indices=args[4],
+        national_indices=args[5],
+        coverage_report=args[6],
+        lead_time_contributions=args[7],
         base_date="2026-09-04",
     )
 
@@ -121,11 +140,12 @@ def test_incomplete_coverage_causes_hold():
     report = audit_all_dates(
         validated=args[0],
         deduplicated=args[1],
-        representative=args[2],
-        stratum_indices=args[3],
-        national_indices=args[4],
+        cleaned=args[2],
+        representative=args[3],
+        stratum_indices=args[4],
+        national_indices=args[5],
         coverage_report=coverage,
-        lead_time_contributions=args[6],
+        lead_time_contributions=args[7],
         base_date="2026-09-04",
     )
 
@@ -144,10 +164,11 @@ def test_contribution_mismatch_causes_hold():
     report = audit_all_dates(
         validated=args[0],
         deduplicated=args[1],
-        representative=args[2],
-        stratum_indices=args[3],
-        national_indices=args[4],
-        coverage_report=args[5],
+        cleaned=args[2],
+        representative=args[3],
+        stratum_indices=args[4],
+        national_indices=args[5],
+        coverage_report=args[6],
         lead_time_contributions=lead,
         base_date="2026-09-04",
     )
