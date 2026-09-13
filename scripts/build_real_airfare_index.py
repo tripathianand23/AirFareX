@@ -234,16 +234,18 @@ def build_representative_fares(
     method: str,
 ) -> pd.DataFrame:
     """
-    Calculate representative fare for each:
+    Calculate source-level representative fares for each:
 
-        collection_date × route × advance_window
+        collection_date × route × advance_window × source
+
+    A median is calculated separately for each source.
+
+    Source-level fares are retained here because daily price
+    relatives are calculated using only sources that are present
+    in both the current and previous complete collection dates.
 
     Currently supported:
-
         median
-
-    Median is used as the prototype representative fare because
-    it is robust to extreme observations.
     """
 
     if method != "median":
@@ -257,6 +259,7 @@ def build_representative_fares(
                 "collection_date",
                 "route",
                 "advance_days",
+                "source",
             ],
             as_index=False,
         )
@@ -283,94 +286,221 @@ def build_stratum_indices(
     representative: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Calculate each route × lead-time stratum relative to BASE_DATE.
+    Calculate matched-source daily chained price relatives for each:
+
+        collection_date × route × advance_window
+
+    For each current stratum, only sources that are present in
+    BOTH the current date and the previous COMPLETE collection
+    date are used.
+
+    Steps:
+
+        1. Match sources between consecutive complete dates.
+        2. Calculate a source-specific price relative:
+               current fare / previous fare * 100
+        3. Average the matched source relatives.
+        4. Return one stratum-level observation.
+
+    This prevents changes in source composition from directly
+    creating artificial price movements.
     """
 
-    base = representative[
-        representative["collection_date"] == BASE_DATE
-    ][
-        [
-            "route",
-            "advance_days",
-            "representative_fare",
-        ]
-    ].rename(
-        columns={
-            "representative_fare":
-                "base_representative_fare",
-        }
-    )
+    result = representative.copy()
 
-    if base.empty:
-        raise ValueError(
-            f"No observations found for base date {BASE_DATE}."
-        )
+    result["collection_date"] = pd.to_datetime(
+        result["collection_date"],
+        errors="coerce",
+    ).dt.date
 
-    duplicate_base = base.duplicated(
-        subset=[
-            "route",
-            "advance_days",
-        ],
-        keep=False,
-    )
+    expected_strata = {
+        (route, window)
+        for route in EXPECTED_ROUTES
+        for window in ADVANCE_WINDOWS
+    }
 
-    if duplicate_base.any():
-        raise ValueError(
-            "Base-period strata are not unique."
-        )
+    # Identify dates having the complete route × lead-time basket.
+    complete_dates = []
 
-    merged = representative.merge(
-        base,
-        on=[
-            "route",
-            "advance_days",
-        ],
-        how="left",
-        validate="many_to_one",
-    )
-
-    if merged[
-        "base_representative_fare"
-    ].isna().any():
-
-        missing = (
-            merged.loc[
-                merged[
-                    "base_representative_fare"
-                ].isna(),
-                [
-                    "route",
-                    "advance_days",
-                ],
-            ]
-            .drop_duplicates()
-            .sort_values(
-                [
-                    "route",
-                    "advance_days",
-                ]
+    for collection_date, group in result.groupby(
+        "collection_date"
+    ):
+        observed = set(
+            zip(
+                group["route"],
+                group["advance_days"].astype(int),
             )
         )
 
-        raise ValueError(
-            "Missing base-period strata:\n"
-            + missing.to_string(index=False)
-        )
+        if observed >= expected_strata:
+            complete_dates.append(collection_date)
 
-    if (
-        merged["base_representative_fare"] <= 0
-    ).any():
-        raise ValueError(
-            "Base representative fares must be positive."
-        )
+    complete_dates = sorted(complete_dates)
 
-    merged["stratum_index"] = (
-        merged["representative_fare"]
-        / merged["base_representative_fare"]
-        * INDEX_BASE
-    )
+    # Output columns.
+    output_rows = []
 
-    return merged
+    for collection_date in sorted(
+        result["collection_date"].dropna().unique()
+    ):
+        previous_dates = [
+            d for d in complete_dates
+            if d < collection_date
+        ]
+
+        if not previous_dates:
+            # First complete date establishes the chained base.
+            current_rows = result[
+                result["collection_date"] == collection_date
+            ]
+
+            for (route, advance_days), group in current_rows.groupby(
+                ["route", "advance_days"]
+            ):
+                valid_fares = group.loc[
+                    group["representative_fare"].notna()
+                    & (group["representative_fare"] > 0),
+                    "representative_fare",
+                ]
+
+                if valid_fares.empty:
+                    continue
+
+                output_rows.append(
+                    {
+                        "collection_date": collection_date,
+                        "route": route,
+                        "advance_days": int(advance_days),
+                        "representative_fare": float(
+                            valid_fares.mean()
+                        ),
+                        "observation_count": int(
+                            group["observation_count"].sum()
+                        ),
+                        "source_count": int(
+                            valid_fares.shape[0]
+                        ),
+                        "matched_source_count": int(
+                            valid_fares.shape[0]
+                        ),
+                        "previous_collection_date": pd.NaT,
+                        "previous_representative_fare": float("nan"),
+                        "stratum_link_index": float("nan"),
+                        "stratum_index": float("nan"),
+                    }
+                )
+
+            continue
+
+        previous_date = max(previous_dates)
+
+        current_rows = result[
+            result["collection_date"] == collection_date
+        ]
+
+        previous_rows = result[
+            result["collection_date"] == previous_date
+        ]
+
+        # Compare each route × lead-time stratum separately.
+        for (route, advance_days), current_group in current_rows.groupby(
+            ["route", "advance_days"]
+        ):
+            previous_group = previous_rows[
+                (previous_rows["route"] == route)
+                & (
+                    previous_rows["advance_days"].astype(int)
+                    == int(advance_days)
+                )
+            ]
+
+            if previous_group.empty:
+                continue
+
+            current_by_source = current_group.set_index("source")
+            previous_by_source = previous_group.set_index("source")
+
+            matched_sources = sorted(
+                set(current_by_source.index)
+                & set(previous_by_source.index)
+            )
+
+            source_links = []
+
+            for source in matched_sources:
+                current_fare = current_by_source.at[
+                    source,
+                    "representative_fare",
+                ]
+
+                previous_fare = previous_by_source.at[
+                    source,
+                    "representative_fare",
+                ]
+
+                if (
+                    pd.isna(current_fare)
+                    or current_fare <= 0
+                    or pd.isna(previous_fare)
+                    or previous_fare <= 0
+                ):
+                    continue
+
+                source_links.append(
+                    float(current_fare)
+                    / float(previous_fare)
+                    * INDEX_BASE
+                )
+
+            if not source_links:
+                continue
+
+            # Equal weight across MATCHED sources.
+            stratum_link = sum(source_links) / len(source_links)
+
+            valid_current = current_group.loc[
+                current_group["representative_fare"].notna()
+                & (current_group["representative_fare"] > 0)
+            ]
+
+            representative_fare = float(
+                valid_current["representative_fare"].mean()
+            )
+
+            output_rows.append(
+                {
+                    "collection_date": collection_date,
+                    "route": route,
+                    "advance_days": int(advance_days),
+                    "representative_fare": representative_fare,
+                    "observation_count": int(
+                        current_group["observation_count"].sum()
+                    ),
+                    "source_count": int(
+                        len(
+                            current_group[
+                                current_group["representative_fare"].notna()
+                            ]
+                        )
+                    ),
+                    "matched_source_count": int(
+                        len(source_links)
+                    ),
+                    "previous_collection_date": previous_date,
+                    "previous_representative_fare": float(
+                        previous_group.loc[
+                            previous_group["source"].isin(
+                                matched_sources
+                            ),
+                            "representative_fare",
+                        ].mean()
+                    ),
+                    "stratum_link_index": stratum_link,
+                    "stratum_index": stratum_link,
+                }
+            )
+
+    return pd.DataFrame(output_rows)
 
 
 # ---------------------------------------------------------------------------
@@ -566,9 +696,11 @@ def build_route_indices(
     stratum_indices: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Aggregate lead-time stratum indices into an equal-weight route index.
-    """
+    Build route-level daily link indices and chained route levels.
 
+    The first complete collection date is the route index base (100).
+    Later dates are chained from the previous complete date.
+    """
     result = (
         stratum_indices.groupby(
             [
@@ -578,8 +710,8 @@ def build_route_indices(
             as_index=False,
         )
         .agg(
-            route_index=(
-                "stratum_index",
+            route_link_index=(
+                "stratum_link_index",
                 "mean",
             ),
             lead_time_strata=(
@@ -590,8 +722,65 @@ def build_route_indices(
                 "observation_count",
                 "sum",
             ),
+            previous_collection_date=(
+                "previous_collection_date",
+                "first",
+            ),
         )
     )
+
+    result = result.sort_values(
+        ["route", "collection_date"]
+    ).reset_index(drop=True)
+
+    result["route_index"] = float("nan")
+
+    complete_dates = sorted(
+        result.loc[
+            result["previous_collection_date"].notna(),
+            "collection_date",
+        ].unique()
+    )
+
+    # The first complete date is the reference level.
+    if complete_dates:
+        first_complete_date = complete_dates[0]
+
+        result.loc[
+            result["collection_date"] == first_complete_date,
+            "route_index",
+        ] = float(INDEX_BASE)
+
+        for route, group in result.groupby("route"):
+            previous_level = float(INDEX_BASE)
+
+            for idx in group.index:
+                collection_date = result.at[
+                    idx,
+                    "collection_date",
+                ]
+
+                if collection_date <= first_complete_date:
+                    continue
+
+                link = result.at[
+                    idx,
+                    "route_link_index",
+                ]
+
+                if pd.isna(link) or link <= 0:
+                    continue
+
+                previous_level = (
+                    previous_level
+                    * float(link)
+                    / float(INDEX_BASE)
+                )
+
+                result.at[
+                    idx,
+                    "route_index",
+                ] = previous_level
 
     return result
 
@@ -605,36 +794,26 @@ def build_national_indices(
     coverage_report: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Aggregate route indices into the national prototype index.
+    Build the national daily chained Airfare Index.
 
-    Equal route weighting is used across the configured route universe.
-
-    A national index is published only when the coverage gate passes.
+    The first complete collection date is 100.
+    Every subsequent complete date is chained from the
+    previous complete date using the national daily link.
     """
-
-    route_weights = (
-        build_equal_route_weights(
-            EXPECTED_ROUTES
-        )
+    route_weights = build_equal_route_weights(
+        EXPECTED_ROUTES
     )
 
     result = route_indices.copy()
 
-    result["route_weight"] = (
-        result["route"].map(
-            route_weights
-        )
+    result["route_weight"] = result["route"].map(
+        route_weights
     )
 
-    if result[
-        "route_weight"
-    ].isna().any():
-
+    if result["route_weight"].isna().any():
         unexpected = sorted(
             result.loc[
-                result[
-                    "route_weight"
-                ].isna(),
+                result["route_weight"].isna(),
                 "route",
             ].unique()
         )
@@ -644,8 +823,8 @@ def build_national_indices(
             + ", ".join(unexpected)
         )
 
-    result["weighted_contribution"] = (
-        result["route_index"]
+    result["weighted_link_contribution"] = (
+        result["route_link_index"]
         * result["route_weight"]
     )
 
@@ -655,8 +834,8 @@ def build_national_indices(
             as_index=False,
         )
         .agg(
-            national_index=(
-                "weighted_contribution",
+            national_link_index=(
+                "weighted_link_contribution",
                 "sum",
             ),
             routes_present=(
@@ -666,6 +845,10 @@ def build_national_indices(
             total_observations=(
                 "observations",
                 "sum",
+            ),
+            previous_collection_date=(
+                "previous_collection_date",
+                "first",
             ),
         )
     )
@@ -693,27 +876,88 @@ def build_national_indices(
         validate="one_to_one",
     )
 
-    national["index_status"] = (
-        national[
-            "coverage_complete"
-        ].map(
-            {
-                True: "VALID",
-                False: "INSUFFICIENT_COVERAGE",
-            }
-        )
+    national = national.sort_values(
+        "collection_date"
+    ).reset_index(drop=True)
+
+    national["national_index"] = float("nan")
+
+    complete_mask = (
+        national["coverage_complete"].fillna(False)
+    )
+
+    complete_dates = national.loc[
+        complete_mask,
+        "collection_date",
+    ].tolist()
+
+    if complete_dates:
+        first_complete_date = complete_dates[0]
+
+        # Initial reference level.
+        national.loc[
+            national["collection_date"]
+            == first_complete_date,
+            "national_index",
+        ] = float(INDEX_BASE)
+
+        previous_index = float(INDEX_BASE)
+
+        for idx in national.index:
+            collection_date = national.at[
+                idx,
+                "collection_date",
+            ]
+
+            if collection_date <= first_complete_date:
+                continue
+
+            if not bool(
+                national.at[
+                    idx,
+                    "coverage_complete",
+                ]
+            ):
+                continue
+
+            link = national.at[
+                idx,
+                "national_link_index",
+            ]
+
+            if pd.isna(link) or link <= 0:
+                continue
+
+            previous_index = (
+                previous_index
+                * float(link)
+                / float(INDEX_BASE)
+            )
+
+            national.at[
+                idx,
+                "national_index",
+            ] = previous_index
+
+    national["index_status"] = "NO_VALID_INDEX"
+
+    valid = (
+        national["coverage_complete"].fillna(False)
+        & national["national_index"].notna()
+        & national["national_index"].gt(0)
     )
 
     national.loc[
-        ~national["coverage_complete"],
-        "national_index",
-    ] = float("nan")
+        ~national["coverage_complete"].fillna(False),
+        "index_status",
+    ] = "INSUFFICIENT_COVERAGE"
 
-    return (
-        national
-        .sort_values("collection_date")
-        .reset_index(drop=True)
-    )
+    national.loc[
+        valid,
+        "index_status",
+    ] = "VALID"
+
+    return national
 
 
 # ---------------------------------------------------------------------------
@@ -1089,6 +1333,16 @@ def main() -> None:
         / "deduplicated_airfare_observations.csv"
     )
 
+    # Cleaned data is the canonical dataset used by the statistical audit.
+    # The real pipeline writes this file directly under data/processed/real/.
+    cleaned_path = (
+        PROJECT_ROOT
+        / "data"
+        / "processed"
+        / "real"
+        / "clean_airfare_observations.csv"
+    )
+
     validated = pd.read_csv(
         validated_path,
         parse_dates=[
@@ -1103,9 +1357,22 @@ def main() -> None:
         ],
     )
 
+    if not cleaned_path.exists():
+        raise FileNotFoundError(
+            f"Cleaned input file not found: {cleaned_path}"
+        )
+
+    cleaned = pd.read_csv(
+        cleaned_path,
+        parse_dates=[
+            "collection_timestamp"
+        ],
+    )
+
     audit_report = audit_all_dates(
         validated=validated,
         deduplicated=deduplicated,
+        cleaned=cleaned,
         representative=representative,
         stratum_indices=stratum_indices,
         national_indices=national_indices,

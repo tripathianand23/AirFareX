@@ -75,6 +75,7 @@ def audit_date(
     collection_date: object,
     validated: pd.DataFrame,
     deduplicated: pd.DataFrame,
+    cleaned: pd.DataFrame,
     representative: pd.DataFrame,
     stratum_indices: pd.DataFrame,
     national_indices: pd.DataFrame,
@@ -119,12 +120,29 @@ def audit_date(
         if not coverage_complete:
             failed.append("coverage")
 
-    date_mask_validated = (
-        pd.to_datetime(validated["collection_timestamp"], errors="coerce")
-        .dt.date == pd.Timestamp(collection_date).date()
-    ) if "collection_timestamp" in validated.columns else pd.Series(False, index=validated.index)
+       # ============================================================
+    # STRUCTURAL VALIDATION
+    # ============================================================
+    #
+    # The validated dataframe represents the incoming observation
+    # layer and may legitimately contain records that are subsequently
+    # removed by the cleaning stage.
+    #
+    # The publication gate therefore checks the FINAL CLEAN DATA.
+    #
 
-    date_validated = validated.loc[date_mask_validated].copy()
+    date_mask_cleaned = (
+        pd.to_datetime(
+            cleaned["collection_timestamp"],
+            errors="coerce",
+        ).dt.date
+        == pd.Timestamp(collection_date).date()
+    ) if "collection_timestamp" in cleaned.columns else pd.Series(
+        False,
+        index=cleaned.index,
+    )
+
+    date_cleaned = cleaned.loc[date_mask_cleaned].copy()
 
     structural_columns = [
         "invalid_fare",
@@ -133,36 +151,104 @@ def audit_date(
         "invalid_advance_window",
         "invalid_date_relationship",
     ]
+
     present_structural = [
-        column for column in structural_columns
-        if column in date_validated.columns
+        column
+        for column in structural_columns
+        if column in date_cleaned.columns
     ]
-    structural_pass = (
-        bool((~date_validated[present_structural].any(axis=1)).all())
-        if present_structural and not date_validated.empty
-        else bool(date_validated.empty or not present_structural)
+
+    if present_structural and not date_cleaned.empty:
+        structural_pass = bool(
+            (~date_cleaned[present_structural].fillna(False)).all(axis=1).all()
+        )
+    else:
+        structural_pass = True
+
+    # Raw validation failures are retained as warnings for transparency.
+    date_mask_validated = (
+        pd.to_datetime(
+            validated["collection_timestamp"],
+            errors="coerce",
+        ).dt.date
+        == pd.Timestamp(collection_date).date()
+    ) if "collection_timestamp" in validated.columns else pd.Series(
+        False,
+        index=validated.index,
     )
+
+    date_validated = validated.loc[date_mask_validated].copy()
+
+    raw_structural_issues = 0
+
+    if present_structural:
+        raw_columns = [
+            column
+            for column in structural_columns
+            if column in date_validated.columns
+        ]
+
+        if raw_columns and not date_validated.empty:
+            raw_structural_issues = int(
+                date_validated[raw_columns]
+                .fillna(False)
+                .any(axis=1)
+                .sum()
+            )
+
+    if raw_structural_issues > 0:
+        warnings.append(
+            f"{raw_structural_issues}_structural_records_removed_before_publication"
+        )
+
     if not structural_pass:
         failed.append("structural_validation")
 
+        # ============================================================
+    # DUPLICATE QUALITY CONTROL
+    # ============================================================
+    #
+    # Duplicate flags in the validated/raw layer are expected because
+    # deduplication is an explicit processing stage.
+    #
+    # Therefore:
+    #   - duplicates BEFORE deduplication -> warning only
+    #   - duplicates AFTER deduplication  -> hard failure
+    #
+
     duplicate_qc_pass = True
+
+    pre_dedup_duplicates = False
+
     if "duplicate_observation" in date_validated.columns:
-        duplicate_qc_pass = not bool(
-            date_validated["duplicate_observation"].fillna(False).any()
+        pre_dedup_duplicates = bool(
+            date_validated["duplicate_observation"]
+            .fillna(False)
+            .any()
         )
-    if not duplicate_qc_pass:
-        # Duplicate flags are expected before deduplication. The gate below
-        # therefore checks the deduplicated result separately.
-        warnings.append("validated_duplicate_flags_present_before_deduplication")
+
+    if pre_dedup_duplicates:
+        warnings.append(
+            "validated_duplicate_flags_present_before_deduplication"
+        )
 
     dedup_dates = (
-        pd.to_datetime(deduplicated["collection_timestamp"], errors="coerce").dt.date
+        pd.to_datetime(
+            deduplicated["collection_timestamp"],
+            errors="coerce",
+        ).dt.date
         == pd.Timestamp(collection_date).date()
-    ) if "collection_timestamp" in deduplicated.columns else pd.Series(False, index=deduplicated.index)
-    dedup_date = deduplicated.loc[dedup_dates]
+    ) if "collection_timestamp" in deduplicated.columns else pd.Series(
+        False,
+        index=deduplicated.index,
+    )
+
+    dedup_date = deduplicated.loc[dedup_dates].copy()
+
     dedup_has_duplicates = bool(
         dedup_date.duplicated().any()
     )
+
     if dedup_has_duplicates:
         duplicate_qc_pass = False
         failed.append("post_dedup_duplicates")
@@ -198,46 +284,118 @@ def audit_date(
         if not index_calculation_pass:
             failed.append("index_calculation")
 
-    base_timestamp = pd.Timestamp(base_date).date()
-    base_rows = representative[
-        pd.to_datetime(representative["collection_date"], errors="coerce").dt.date
-        == base_timestamp
-    ] if "collection_date" in representative.columns else pd.DataFrame()
+    # ============================================================
+    # CHAINED INDEX QUALITY CONTROL
+    # ============================================================
+    #
+    # The index is now chained day-to-day.
+    #
+    # Therefore we do NOT require every date to be compared with
+    # base_date. Instead:
+    #
+    #   first complete date  -> index_base (100)
+    #   later dates          -> previous complete date
+    #
+    # Contribution reconciliation must therefore compare against
+    # the DAILY LINK movement:
+    #
+    #   national_link_index - 100
+    #
+    # rather than:
+    #
+    #   national_index - 100
+    # ============================================================
 
-    base_period_pass = (
-        not base_rows.empty
-        and "representative_fare" in base_rows.columns
-        and base_rows["representative_fare"].map(_is_finite_positive).all()
-    )
+    base_period_pass = True
+
+    if national is not None:
+        national_link_index = national.get(
+            "national_link_index"
+        )
+
+        previous_collection_date = national.get(
+            "previous_collection_date"
+        )
+
+        if (
+            previous_collection_date is None
+            or pd.isna(previous_collection_date)
+        ):
+            # This is the first valid/complete observation in
+            # the chained series. It must establish the base.
+            base_period_pass = (
+                national_index is not None
+                and abs(
+                    national_index - index_base
+                ) <= tolerance
+            )
+        else:
+            # Later dates are chained from the previous complete
+            # collection date and therefore do not need to equal
+            # the fixed base value.
+            base_period_pass = (
+                national_index is not None
+                and _is_finite_positive(
+                    national_index
+                )
+                and _is_finite_positive(
+                    national_link_index
+                )
+            )
+    else:
+        base_period_pass = False
+
     if not base_period_pass:
         failed.append("base_period")
 
     contribution_date = lead_time_contributions[
         pd.to_datetime(
-            lead_time_contributions["collection_date"], errors="coerce"
-        ).dt.date == pd.Timestamp(collection_date).date()
+            lead_time_contributions["collection_date"],
+            errors="coerce",
+        ).dt.date
+        == pd.Timestamp(collection_date).date()
     ].copy() if "collection_date" in lead_time_contributions.columns else pd.DataFrame()
 
     contribution_reconciliation_pass = False
     movement_from_base_pct = None
 
-    if index_calculation_pass and national_index is not None:
-        movement_from_base_pct = national_index - index_base
+    if (
+        index_calculation_pass
+        and national is not None
+    ):
+        national_link_index = national.get(
+            "national_link_index"
+        )
 
-        if not contribution_date.empty:
-            contribution_sum = float(
-                contribution_date["contribution_to_national_index"].sum()
+        if _is_finite_positive(
+            national_link_index
+        ):
+            # This field retains its existing name for
+            # compatibility with the rest of AirfareX,
+            # but now represents the DAILY chained movement.
+            movement_from_base_pct = (
+                float(national_link_index)
+                - index_base
             )
-            contribution_reconciliation_pass = (
-                abs(contribution_sum - movement_from_base_pct)
-                <= tolerance
-            )
+
+            if not contribution_date.empty:
+                contribution_sum = float(
+                    contribution_date[
+                        "contribution_to_national_index"
+                    ].sum()
+                )
+
+                contribution_reconciliation_pass = (
+                    abs(
+                        contribution_sum
+                        - movement_from_base_pct
+                    )
+                    <= tolerance
+                )
 
     if not contribution_reconciliation_pass:
         failed.append("contribution_reconciliation")
 
-    # A coverage failure is already a hard publication failure, even if an
-    # index value happened to be computable.
     publication_status = "PUBLISHABLE" if not failed else "HOLD"
 
     return AuditResult(
@@ -264,8 +422,10 @@ def audit_date(
 
 def audit_all_dates(
     *,
+
     validated: pd.DataFrame,
     deduplicated: pd.DataFrame,
+    cleaned: pd.DataFrame,
     representative: pd.DataFrame,
     stratum_indices: pd.DataFrame,
     national_indices: pd.DataFrame,
@@ -289,6 +449,7 @@ def audit_all_dates(
 
     results = [
         audit_date(
+            cleaned=cleaned,
             collection_date=date,
             validated=validated,
             deduplicated=deduplicated,

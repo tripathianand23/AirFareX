@@ -13,6 +13,7 @@ CANONICAL_COLUMNS = [
     "destination",
     "travel_date",
     "airline",
+    "flight_number",
     
     "departure_time",
     "arrival_time",
@@ -45,8 +46,9 @@ REQUIRED_COLUMNS = [
     "destination",
     "travel_date",
     "airline",
+    "flight_number",
     "advance_days",
-    "base fare",
+    "base_fare",
     "currency",
     "ingestion_timestamp",
 ]

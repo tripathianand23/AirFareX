@@ -5,7 +5,7 @@ project:
 
 index:
   base_value: 100.0
-  base_date: "2026-09-04"
+  base_date: "2026-09-10"
   representative_fare_method: "median"
   route_weighting: "equal"
   lead_time_weighting: "equal"
