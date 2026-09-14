@@ -88,7 +88,7 @@ def display_chart_data_table(title, df, column_map=None, round_digits=2):
 # ============================================================
 
 st.set_page_config(
-    page_title="AirFareX",
+    page_title="AirfareX",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -116,12 +116,12 @@ st.markdown(
        Visual layer only — data/statistical logic is unchanged.
        ======================================================== */
     .stApp {
-        background:#f6f8fb;
+        background:#f9f1f0;
         color:#172033;
     }
 
     [data-testid="stAppViewContainer"] {
-        background:#f6f8fb;
+        background:#f9f1f0;
     }
 
     [data-testid="stHeader"] {
@@ -166,7 +166,7 @@ st.markdown(
         position:relative;
         margin:0 0 1.1rem 0;
         padding:0.85rem 0.9rem 1rem;
-        border-radius:0 0 18px 18px;
+        border-radius:18px;
         overflow:hidden;
         isolation:isolate;
         color:#fff;
@@ -210,11 +210,7 @@ st.markdown(
         border-radius:14px;
         overflow:hidden;
         color:#fff;
-        background:rgba(6,39,65,.20);
-        border:1px solid rgba(255,255,255,.14);
-        box-shadow:inset 0 1px 0 rgba(255,255,255,.12);
-        backdrop-filter:blur(3px);
-        -webkit-backdrop-filter:blur(3px);
+        background:transparent;
     }
 
     .hero h1 {
