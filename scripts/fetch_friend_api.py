@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 import requests
@@ -115,7 +116,12 @@ def main():
     new_records = fetch_api_data(hours_back=24)
 
     if not new_records:
-        raise RuntimeError("API returned zero records.")
+        print("API returned zero records. Nothing new to ingest.")
+        # Exit code 2 = "nothing to do" (distinct from real errors).
+        # The daily shell wrapper treats this as a non-error and
+        # skips the pipeline/index rebuild while still pushing any
+        # pending local changes.
+        sys.exit(2)
 
     existing_records = load_existing_records()
 
