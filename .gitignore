@@ -41,3 +41,9 @@ data/raw/airfare_index.json
 *.before_idempotency_fix
 *.before_quality_comparison
 *.fixed_base_backup.py
+
+# Local backup files (do not commit)
+*.backup
+*.before_idempotency_fix
+*.before_quality_comparison
+*.fixed_base_backup.py
