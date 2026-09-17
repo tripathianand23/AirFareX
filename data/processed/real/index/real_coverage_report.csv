@@ -11,3 +11,5 @@ collection_date,routes_present,expected_routes,route_coverage_ratio,lead_windows
 2026-09-11,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
 2026-09-12,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
 2026-09-13,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
+2026-09-15,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
+2026-09-16,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS

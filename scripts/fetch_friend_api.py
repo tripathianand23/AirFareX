@@ -51,10 +51,14 @@ def load_existing_records():
 
 def record_key(record):
     """
-    Exact observation identity.
+    Idempotent observation identity, robust across all API and
+    scraper payload schemas seen during this project.
 
-    Timestamp is included because the same route/airline/window
-    can legitimately have different fares at different collection times.
+    Missing fields resolve to "" so records written by older
+    schema versions deduplicate correctly against newer ones.
+
+    T-slot (departure_time) is preserved when present so
+    flight-level multiplicity is NOT collapsed.
     """
 
     return (
@@ -62,15 +66,15 @@ def record_key(record):
         str(record.get("airline", "")),
         str(record.get("route", "")),
         str(record.get("advance_window_days", "")),
-        str(record.get("departure_time", "")),
         str(record.get("base_fare", "")),
         str(record.get("taxes_fees", "")),
         str(record.get("total_fare", "")),
         str(record.get("ota_source", "")),
         str(record.get("departure_time", "")),
-str(record.get("flight_number", "")),
-str(record.get("arrival_time", "")),
-str(record.get("travel_date", ""))
+        str(record.get("id", "")),
+        str(record.get("flight_number", "")),
+        str(record.get("arrival_time", "")),
+        str(record.get("travel_date", "")),
     )
 
 
