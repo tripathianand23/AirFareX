@@ -2115,7 +2115,6 @@ with pages[4]:
                     "origin",
                     "destination",
                     "airline",
-                    "flight_number",
                     "advance_days",
                     "base_fare",
                     "taxes",

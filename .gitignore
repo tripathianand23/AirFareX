@@ -37,3 +37,7 @@ data/processed/real/clean_airfare_observations.csv
 scripts/*.fixed_base_backup.py
 src/airfare_ml/index/*.fixed_base_backup.py
 data/raw/airfare_index.json
+*.backup
+*.before_idempotency_fix
+*.before_quality_comparison
+*.fixed_base_backup.py
