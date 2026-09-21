@@ -1,15 +1,20 @@
 collection_date,observations,routes_present,expected_routes,observed_strata,required_strata,coverage_complete,structural_validation_pass,duplicate_qc_pass,representative_fares_pass,index_calculation_pass,contribution_reconciliation_pass,base_period_pass,national_index,movement_from_base_pct,publication_status,failed_checks,warnings
-2026-09-02,1405,1,20,5,100,False,True,True,True,False,True,False,,,HOLD,"('coverage', 'index_calculation', 'base_period')","('validated_duplicate_flags_present_before_deduplication',)"
+2026-09-02,1244,1,20,5,100,False,True,True,True,False,True,False,,,HOLD,"('coverage', 'index_calculation', 'base_period')","('validated_duplicate_flags_present_before_deduplication',)"
 2026-09-03,373,1,20,5,100,False,True,True,True,False,True,False,,,HOLD,"('coverage', 'index_calculation', 'base_period')","('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-04,6998,20,20,100,100,True,True,True,True,True,True,True,100.0,,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-05,6420,20,20,100,100,True,True,True,True,True,True,True,103.37006586209331,3.3700658620932984,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-06,7254,20,20,100,100,True,True,True,True,True,True,True,93.857336361262,-9.202595956088786,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-07,5867,20,20,100,100,True,True,True,True,True,True,True,73.57857620979108,-21.60594039598233,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-08,2976,20,20,100,100,True,True,True,True,True,True,True,74.6985204178372,1.5221063871266978,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-09,3118,20,20,100,100,True,True,True,True,True,True,True,75.57666321329143,1.1755825825494242,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-10,4015,20,20,100,100,True,True,True,True,True,True,True,79.31877146585785,4.951407079200479,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-11,3632,20,20,100,100,True,True,True,True,True,True,True,77.074336305422,-2.8296393387811776,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-09-12,3599,20,20,100,100,True,True,True,True,True,True,True,74.64618097590507,-3.1504070562409936,PUBLISHABLE,(),()
-2026-09-13,129080,20,20,100,100,True,True,True,True,True,True,True,71.12033139430531,-4.723415900858825,PUBLISHABLE,(),()
-2026-09-15,61828,20,20,100,100,True,True,True,True,True,True,True,72.90874237214156,2.5146268904751565,PUBLISHABLE,(),()
-2026-09-16,67982,20,20,100,100,True,True,True,True,True,True,True,79.21192092449819,8.645298694337484,PUBLISHABLE,(),()
+2026-09-04,23260,20,20,100,100,True,True,True,True,True,True,True,100.0,,PUBLISHABLE,(),()
+2026-09-05,19747,20,20,100,100,True,True,True,True,True,True,True,105.64171881648541,5.641718816485408,PUBLISHABLE,(),()
+2026-09-06,37875,20,20,100,100,True,True,True,True,True,True,True,91.60613220975983,-13.286026357737867,PUBLISHABLE,(),()
+2026-09-07,59272,20,20,100,100,True,True,True,True,True,True,True,72.70917288011202,-20.628487278971164,PUBLISHABLE,(),()
+2026-09-08,117444,20,20,100,100,True,True,True,True,True,True,True,75.22840361047427,3.464804550199105,PUBLISHABLE,(),()
+2026-09-09,58719,20,20,100,100,True,True,True,True,True,True,True,75.90527728265519,0.8997581228570368,PUBLISHABLE,(),()
+2026-09-10,27957,20,20,100,100,True,True,True,True,True,True,True,82.04487116405717,8.088494108966131,PUBLISHABLE,(),()
+2026-09-11,28565,20,20,100,100,True,True,True,True,True,True,True,80.43932882191893,-1.9569076279342141,PUBLISHABLE,(),()
+2026-09-12,30970,20,20,100,100,True,True,True,True,True,True,True,76.38224908660678,-5.04365189855568,PUBLISHABLE,(),()
+2026-09-13,31218,20,20,100,100,True,True,True,True,True,True,True,76.32454678225338,-0.07554412843745695,PUBLISHABLE,(),()
+2026-09-14,31377,20,20,100,100,True,True,True,True,True,True,True,77.49650334913969,1.5354910265367039,PUBLISHABLE,(),()
+2026-09-15,30925,20,20,100,100,True,True,True,True,True,True,True,78.59240526446233,1.414130790373008,PUBLISHABLE,(),()
+2026-09-16,38832,20,20,100,100,True,True,True,True,True,True,True,85.38695345063933,8.645298694337484,PUBLISHABLE,(),()
+2026-09-17,27097,20,20,100,100,True,True,True,True,True,True,True,124.48872208196666,45.793610207596146,PUBLISHABLE,(),()
+2026-09-18,30181,20,20,100,100,True,True,True,True,True,True,True,125.06619403613415,0.4638749153415489,PUBLISHABLE,(),()
+2026-09-20,27826,20,20,100,100,True,True,True,True,True,True,True,128.0013987997242,2.3469209934876574,PUBLISHABLE,(),()
+2026-09-21,37245,20,20,100,100,True,True,True,True,True,True,True,126.08694802129807,-1.4956483260167772,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"

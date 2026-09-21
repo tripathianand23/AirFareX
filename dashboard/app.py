@@ -88,7 +88,7 @@ def display_chart_data_table(title, df, column_map=None, round_digits=2):
 # ============================================================
 
 st.set_page_config(
-    page_title="AirfareX",
+    page_title="AirFareX",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="expanded",

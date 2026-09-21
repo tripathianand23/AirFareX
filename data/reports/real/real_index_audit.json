@@ -4,7 +4,7 @@
   "dates": [
     {
       "collection_date": "2026-09-02",
-      "observations": 1405,
+      "observations": 1244,
       "routes_present": 1,
       "expected_routes": 20,
       "observed_strata": 5,
@@ -56,7 +56,7 @@
     },
     {
       "collection_date": "2026-09-04",
-      "observations": 6998,
+      "observations": 23260,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -72,13 +72,11 @@
       "movement_from_base_pct": NaN,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
-      "warnings": [
-        "validated_duplicate_flags_present_before_deduplication"
-      ]
+      "warnings": []
     },
     {
       "collection_date": "2026-09-05",
-      "observations": 6420,
+      "observations": 19747,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -90,17 +88,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 103.37006586209331,
-      "movement_from_base_pct": 3.3700658620932984,
+      "national_index": 105.64171881648541,
+      "movement_from_base_pct": 5.641718816485408,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
-      "warnings": [
-        "validated_duplicate_flags_present_before_deduplication"
-      ]
+      "warnings": []
     },
     {
       "collection_date": "2026-09-06",
-      "observations": 7254,
+      "observations": 37875,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -112,17 +108,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 93.857336361262,
-      "movement_from_base_pct": -9.202595956088786,
+      "national_index": 91.60613220975983,
+      "movement_from_base_pct": -13.286026357737867,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
-      "warnings": [
-        "validated_duplicate_flags_present_before_deduplication"
-      ]
+      "warnings": []
     },
     {
       "collection_date": "2026-09-07",
-      "observations": 5867,
+      "observations": 59272,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -134,17 +128,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 73.57857620979108,
-      "movement_from_base_pct": -21.60594039598233,
+      "national_index": 72.70917288011202,
+      "movement_from_base_pct": -20.628487278971164,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
-      "warnings": [
-        "validated_duplicate_flags_present_before_deduplication"
-      ]
+      "warnings": []
     },
     {
       "collection_date": "2026-09-08",
-      "observations": 2976,
+      "observations": 117444,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -156,17 +148,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 74.6985204178372,
-      "movement_from_base_pct": 1.5221063871266978,
+      "national_index": 75.22840361047427,
+      "movement_from_base_pct": 3.464804550199105,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
-      "warnings": [
-        "validated_duplicate_flags_present_before_deduplication"
-      ]
+      "warnings": []
     },
     {
       "collection_date": "2026-09-09",
-      "observations": 3118,
+      "observations": 58719,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -178,17 +168,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 75.57666321329143,
-      "movement_from_base_pct": 1.1755825825494242,
+      "national_index": 75.90527728265519,
+      "movement_from_base_pct": 0.8997581228570368,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
-      "warnings": [
-        "validated_duplicate_flags_present_before_deduplication"
-      ]
+      "warnings": []
     },
     {
       "collection_date": "2026-09-10",
-      "observations": 4015,
+      "observations": 27957,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -200,17 +188,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 79.31877146585785,
-      "movement_from_base_pct": 4.951407079200479,
+      "national_index": 82.04487116405717,
+      "movement_from_base_pct": 8.088494108966131,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
-      "warnings": [
-        "validated_duplicate_flags_present_before_deduplication"
-      ]
+      "warnings": []
     },
     {
       "collection_date": "2026-09-11",
-      "observations": 3632,
+      "observations": 28565,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -222,17 +208,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 77.074336305422,
-      "movement_from_base_pct": -2.8296393387811776,
+      "national_index": 80.43932882191893,
+      "movement_from_base_pct": -1.9569076279342141,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
-      "warnings": [
-        "validated_duplicate_flags_present_before_deduplication"
-      ]
+      "warnings": []
     },
     {
       "collection_date": "2026-09-12",
-      "observations": 3599,
+      "observations": 30970,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -244,15 +228,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 74.64618097590507,
-      "movement_from_base_pct": -3.1504070562409936,
+      "national_index": 76.38224908660678,
+      "movement_from_base_pct": -5.04365189855568,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
       "warnings": []
     },
     {
       "collection_date": "2026-09-13",
-      "observations": 129080,
+      "observations": 31218,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -264,15 +248,35 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 71.12033139430531,
-      "movement_from_base_pct": -4.723415900858825,
+      "national_index": 76.32454678225338,
+      "movement_from_base_pct": -0.07554412843745695,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": []
+    },
+    {
+      "collection_date": "2026-09-14",
+      "observations": 31377,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 77.49650334913969,
+      "movement_from_base_pct": 1.5354910265367039,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
       "warnings": []
     },
     {
       "collection_date": "2026-09-15",
-      "observations": 61828,
+      "observations": 30925,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -284,15 +288,15 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 72.90874237214156,
-      "movement_from_base_pct": 2.5146268904751565,
+      "national_index": 78.59240526446233,
+      "movement_from_base_pct": 1.414130790373008,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
       "warnings": []
     },
     {
       "collection_date": "2026-09-16",
-      "observations": 67982,
+      "observations": 38832,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -304,11 +308,93 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 79.21192092449819,
+      "national_index": 85.38695345063933,
       "movement_from_base_pct": 8.645298694337484,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
       "warnings": []
+    },
+    {
+      "collection_date": "2026-09-17",
+      "observations": 27097,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 124.48872208196666,
+      "movement_from_base_pct": 45.793610207596146,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": []
+    },
+    {
+      "collection_date": "2026-09-18",
+      "observations": 30181,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 125.06619403613415,
+      "movement_from_base_pct": 0.4638749153415489,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": []
+    },
+    {
+      "collection_date": "2026-09-20",
+      "observations": 27826,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 128.0013987997242,
+      "movement_from_base_pct": 2.3469209934876574,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": []
+    },
+    {
+      "collection_date": "2026-09-21",
+      "observations": 37245,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 126.08694802129807,
+      "movement_from_base_pct": -1.4956483260167772,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": [
+        "validated_duplicate_flags_present_before_deduplication"
+      ]
     }
   ]
 }

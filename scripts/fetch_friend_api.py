@@ -1,38 +1,56 @@
 import json
 import sys
 from pathlib import Path
-
 import requests
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 API_URL = "https://mospi-apix-api.onrender.com/api/fares/raw"
 RAW_PATH = PROJECT_ROOT / "data/raw/airfare_index.json"
 
+def fetch_api_data(hours_back=24, date=None, batch_size=50000):
+    """
+    Fetches raw airfare records across paginated chunks to avoid
+    Render server memory overruns and HTTP gateway timeouts.
+    """
+    if date:
+        print(f"Fetching API data for specific date: {date} (batch size: {batch_size:,})...")
+    else:
+        print(f"Fetching API data for last {hours_back} hours (batch size: {batch_size:,})...")
 
-def fetch_api_data(hours_back=24):
-    print(f"Fetching API data for last {hours_back} hours...")
+    all_records = []
+    current_page = 1
+    has_next = True
 
-    response = requests.get(
-        API_URL,
-        params={"hours_back": hours_back},
-        timeout=120,
-    )
+    while has_next:
+        params = {
+            "page": current_page,
+            "size": batch_size
+        }
+        if date:
+            params["date"] = date
+        else:
+            params["hours_back"] = hours_back
 
-    response.raise_for_status()
+        response = requests.get(API_URL, params=params, timeout=180)
+        response.raise_for_status()
 
-    payload = response.json()
+        payload = response.json()
+        if payload.get("status") != "ok":
+            raise RuntimeError(f"API returned error on page {current_page}: {payload}")
 
-    if payload.get("status") != "ok":
-        raise RuntimeError(f"API returned error: {payload}")
+        records = payload.get("data", [])
+        all_records.extend(records)
 
-    records = payload.get("data", [])
+        pagination = payload.get("pagination", {})
+        total_pages = pagination.get("total_pages", 1)
+        has_next = pagination.get("has_next", False)
 
-    print(f"API returned {len(records):,} records")
+        print(f"  -> Page {current_page}/{total_pages} fetched ({len(records):,} records)")
+        current_page += 1
 
-    return records
-
+    print(f"Total records fetched from API: {len(all_records):,}")
+    return all_records
 
 def load_existing_records():
     if not RAW_PATH.exists():
@@ -49,19 +67,11 @@ def load_existing_records():
 
     raise ValueError("Existing raw airfare JSON has invalid structure.")
 
-
 def record_key(record):
     """
     Idempotent observation identity, robust across all API and
     scraper payload schemas seen during this project.
-
-    Missing fields resolve to "" so records written by older
-    schema versions deduplicate correctly against newer ones.
-
-    T-slot (departure_time) is preserved when present so
-    flight-level multiplicity is NOT collapsed.
     """
-
     return (
         str(record.get("timestamp", "")),
         str(record.get("airline", "")),
@@ -78,24 +88,19 @@ def record_key(record):
         str(record.get("travel_date", "")),
     )
 
-
 def merge_records(existing, new_records):
     existing_keys = {record_key(row) for row in existing}
-
     added = 0
 
     for record in new_records:
         key = record_key(record)
-
         if key in existing_keys:
             continue
-
         existing.append(record)
         existing_keys.add(key)
         added += 1
 
     return existing, added
-
 
 def save_raw_data(records):
     RAW_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -105,26 +110,19 @@ def save_raw_data(records):
     }
 
     temp_path = RAW_PATH.with_suffix(".tmp")
-
     with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2)
 
     temp_path.replace(RAW_PATH)
 
-
 def main():
-    new_records = fetch_api_data(hours_back=24)
+    new_records = fetch_api_data(hours_back=720)
 
     if not new_records:
         print("API returned zero records. Nothing new to ingest.")
-        # Exit code 2 = "nothing to do" (distinct from real errors).
-        # The daily shell wrapper treats this as a non-error and
-        # skips the pipeline/index rebuild while still pushing any
-        # pending local changes.
         sys.exit(2)
 
     existing_records = load_existing_records()
-
     print(f"Existing raw records: {len(existing_records):,}")
 
     merged_records, added = merge_records(
@@ -137,9 +135,7 @@ def main():
     print(f"New unique records: {added:,}")
     print(f"Total raw records: {len(merged_records):,}")
     print(f"Saved to: {RAW_PATH}")
-
     print("\nIncremental API fetch completed successfully.")
-
 
 if __name__ == "__main__":
     main()
