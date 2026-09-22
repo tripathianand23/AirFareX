@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import pandas as pd
-
+import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -232,18 +232,90 @@ def load_raw_observations() -> pd.DataFrame:
 # OBSERVATIONS USED BY EXPLORATORY DASHBOARD VIEWS
 # ============================================================
 
+FRIEND_API_URL = "https://mospi-apix-api.onrender.com/api/fares/raw"
+FRIEND_API_HOURS_BACK = 24  # 1 day(s)
+
+@st.cache_data(ttl=900, show_spinner=False)
+
+def _load_friend_api_observations() -> pd.DataFrame:
+    """
+    Fetch airfare observations from the Friend API.
+
+    Used primarily by deployed environments where the large local
+    generated datasets are intentionally not stored in GitHub.
+
+    The API response is normalized through the same dashboard
+    boundary normalization used by local JSON/CSV data.
+    """
+    import requests
+
+    try:
+        response = requests.get(
+            FRIEND_API_URL,
+            params={"hours_back": FRIEND_API_HOURS_BACK},
+            timeout=120,
+        )
+        response.raise_for_status()
+
+        payload = response.json()
+
+    except requests.RequestException as exc:
+        raise RuntimeError(
+            "Unable to fetch airfare observations from Friend API:\n"
+            f"{FRIEND_API_URL}\n\n"
+            f"Error: {exc}"
+        ) from exc
+
+    # Support common API response shapes.
+    if isinstance(payload, list):
+        records = payload
+
+    elif isinstance(payload, dict):
+        if isinstance(payload.get("raw_fares"), list):
+            records = payload["raw_fares"]
+
+        elif isinstance(payload.get("data"), list):
+            records = payload["data"]
+
+        elif isinstance(payload.get("fares"), list):
+            records = payload["fares"]
+
+        else:
+            records = []
+
+    else:
+        records = []
+
+    if not records:
+        return pd.DataFrame()
+
+    return _normalise_observation_columns(
+        pd.DataFrame(records)
+    )
+
+
 def load_clean_data(mode: str = "real") -> pd.DataFrame:
     """
     Load the dashboard observation universe.
 
-    For real data, prefer the complete dashboard observation file when
-    available. If it does not exist, fall back to the processed clean file.
-    If neither exists, fall back to the complete raw observation universe.
+    REAL DATA PRIORITY:
 
-    This prevents the dashboard from silently displaying only the smaller
-    deduplicated/processed subset when the complete raw dataset is present.
+    1. dashboard_airfare_observations.csv
+    2. clean_airfare_observations.csv
+    3. local raw airfare_index.json
+    4. Friend API
+
+    The Friend API is used only when the deployed environment does
+    not contain the large generated local datasets.
+
+    Local development therefore continues using the existing
+    processed dataset without changing the statistical pipeline.
     """
     if mode.lower() == "real":
+
+        # --------------------------------------------------------
+        # 1. Local dashboard dataset
+        # --------------------------------------------------------
         preferred_paths = [
             REAL_DIR / "dashboard_airfare_observations.csv",
             REAL_DIR / "clean_airfare_observations.csv",
@@ -255,8 +327,23 @@ def load_clean_data(mode: str = "real") -> pd.DataFrame:
                     pd.read_csv(path)
                 )
 
-        return load_raw_observations()
+        # --------------------------------------------------------
+        # 2. Local raw JSON
+        # --------------------------------------------------------
+        if RAW_JSON_PATH.exists():
+            raw_df = load_raw_observations()
 
+            if not raw_df.empty:
+                return raw_df
+
+        # --------------------------------------------------------
+        # 3. Friend API fallback
+        # --------------------------------------------------------
+        return _load_friend_api_observations()
+
+    # ------------------------------------------------------------
+    # SYNTHETIC DATA
+    # ------------------------------------------------------------
     path = _path(
         "synthetic",
         "clean_airfare_observations.csv",
@@ -270,8 +357,6 @@ def load_clean_data(mode: str = "real") -> pd.DataFrame:
     return _normalise_observation_columns(
         pd.read_csv(path)
     )
-
-
 # ============================================================
 # DAILY INDEX
 # ============================================================
