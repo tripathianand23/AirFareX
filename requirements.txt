@@ -33,3 +33,4 @@ python-dotenv
 
 pytest
 
+boto3

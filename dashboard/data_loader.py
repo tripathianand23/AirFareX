@@ -4,6 +4,8 @@ from pathlib import Path
 import json
 import pandas as pd
 import streamlit as st
+from io import BytesIO
+import os
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,7 +14,118 @@ REAL_DIR = PROJECT_ROOT / "data" / "processed" / "real"
 REAL_INDEX_DIR = REAL_DIR / "index"
 RAW_JSON_PATH = PROJECT_ROOT / "data" / "raw" / "airfare_index.json"
 
+# ============================================================
+# CLOUDFLARE R2
+# ============================================================
 
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "").strip()
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "").strip()
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "").strip()
+R2_BUCKET = os.getenv("R2_BUCKET", "airfare-data").strip()
+
+R2_ENDPOINT = os.getenv(
+    "R2_ENDPOINT",
+    f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+    if R2_ACCOUNT_ID
+    else "",
+).strip()
+
+R2_ENABLED = bool(
+    R2_ACCOUNT_ID
+    and R2_ACCESS_KEY_ID
+    and R2_SECRET_ACCESS_KEY
+    and R2_BUCKET
+    and R2_ENDPOINT
+)
+
+R2_CLEAN_PARQUET_KEY = "processed/clean_airfare_observations.parquet"
+R2_RAW_JSON_KEY = "raw/airfare_index.json"
+
+
+# ============================================================
+# CLOUDFLARE R2 HELPERS
+# ============================================================
+
+@st.cache_resource(show_spinner=False)
+def _get_r2_client():
+    """Create a Cloudflare R2 S3-compatible client."""
+    if not R2_ENABLED:
+        return None
+
+    import boto3
+
+    return boto3.client(
+        "s3",
+        endpoint_url=R2_ENDPOINT,
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name="auto",
+    )
+
+
+def _r2_enabled() -> bool:
+    return R2_ENABLED
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _read_r2_bytes(remote_key: str) -> bytes:
+    """Read one object from Cloudflare R2."""
+    client = _get_r2_client()
+
+    if client is None:
+        raise RuntimeError("Cloudflare R2 is not configured.")
+
+    response = client.get_object(
+        Bucket=R2_BUCKET,
+        Key=remote_key,
+    )
+
+    return response["Body"].read()
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _read_r2_dataframe(remote_key: str) -> pd.DataFrame:
+    """Read CSV or Parquet data from R2."""
+    payload = _read_r2_bytes(remote_key)
+
+    if remote_key.lower().endswith(".parquet"):
+        return pd.read_parquet(BytesIO(payload))
+
+    if remote_key.lower().endswith(".csv"):
+        return pd.read_csv(BytesIO(payload))
+
+    raise ValueError(
+        f"Unsupported R2 tabular file: {remote_key}"
+    )
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _read_r2_json(remote_key: str):
+    """Read JSON data from R2."""
+    payload = _read_r2_bytes(remote_key)
+
+    return json.loads(
+        payload.decode("utf-8")
+    )
+
+
+def _r2_object_exists(remote_key: str) -> bool:
+    """Check whether an object exists in R2."""
+    client = _get_r2_client()
+
+    if client is None:
+        return False
+
+    try:
+        client.head_object(
+            Bucket=R2_BUCKET,
+            Key=remote_key,
+        )
+        return True
+    except Exception:
+        return False
+
+    
 # ============================================================
 # PATH HELPERS
 # ============================================================
@@ -135,6 +248,30 @@ def _normalise_observation_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     if rename_map:
         out = out.rename(columns=rename_map)
+        # Friend API provides route as "ORIGIN-DESTINATION".
+    # Dashboard/monitoring expects separate origin and destination columns.
+    if "route" in out.columns:
+        route_parts = (
+            out["route"]
+            .astype("string")
+            .str.strip()
+            .str.upper()
+            .str.split("-", n=1, expand=True)
+        )
+
+        if "origin" not in out.columns:
+            out["origin"] = (
+                route_parts[0]
+                if 0 in route_parts.columns
+                else pd.NA
+            )
+
+        if "destination" not in out.columns:
+            out["destination"] = (
+                route_parts[1]
+                if 1 in route_parts.columns
+                else pd.NA
+            )    
 
     # Source contains one combined taxes_fees field. Keep the original
     # value as taxes while explicitly mapping consumer fare to source total.
@@ -233,7 +370,7 @@ def load_raw_observations() -> pd.DataFrame:
 # ============================================================
 
 FRIEND_API_URL = "https://mospi-apix-api.onrender.com/api/fares/raw"
-FRIEND_API_HOURS_BACK = 24  # 1 day(s)
+FRIEND_API_HOURS_BACK = 720  # 30day(s)
 
 @st.cache_data(ttl=900, show_spinner=False)
 
@@ -292,7 +429,141 @@ def _load_friend_api_observations() -> pd.DataFrame:
     return _normalise_observation_columns(
         pd.DataFrame(records)
     )
+    FRIEND_API_URL = "https://mospi-apix-api.onrender.com/api/fares/raw"
 
+# Friend API has a 50,000-record page limit.
+# Fetch each calendar date separately and follow all pages.
+FRIEND_API_START_DATE = "2026-09-02"
+FRIEND_API_PAGE_SIZE = 50000
+FRIEND_API_TIMEOUT = 120
+FRIEND_API_RETRIES = 3
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _load_friend_api_observations() -> pd.DataFrame:
+    """
+    Fetch complete historical airfare observations from Friend API.
+
+    Uses date-based pagination instead of hours_back because the API
+    caps responses at 50,000 records.
+    """
+    from datetime import date, timedelta
+    import os
+    import time
+    import requests
+
+    configured_start = os.getenv(
+        "FRIEND_API_START_DATE",
+        FRIEND_API_START_DATE,
+    ).strip()
+
+    try:
+        start_date = date.fromisoformat(configured_start)
+    except ValueError as exc:
+        raise RuntimeError(
+            "Invalid FRIEND_API_START_DATE. Expected YYYY-MM-DD, "
+            f"received: {configured_start!r}"
+        ) from exc
+
+    end_date = date.today()
+
+    if start_date > end_date:
+        raise RuntimeError(
+            f"FRIEND_API_START_DATE cannot be later than today: "
+            f"{start_date} > {end_date}"
+        )
+
+    all_records = []
+    session = requests.Session()
+
+    current_date = start_date
+
+    while current_date <= end_date:
+        date_string = current_date.isoformat()
+        page = 1
+
+        while True:
+            params = {
+                "date": date_string,
+                "page": page,
+                "size": FRIEND_API_PAGE_SIZE,
+            }
+
+            payload = None
+            last_error = None
+
+            for attempt in range(1, FRIEND_API_RETRIES + 1):
+                try:
+                    response = session.get(
+                        FRIEND_API_URL,
+                        params=params,
+                        timeout=FRIEND_API_TIMEOUT,
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    break
+
+                except (requests.RequestException, ValueError) as exc:
+                    last_error = exc
+
+                    if attempt < FRIEND_API_RETRIES:
+                        time.sleep(2 * attempt)
+
+            if payload is None:
+                raise RuntimeError(
+                    "Unable to fetch airfare observations from Friend API.\n"
+                    f"Date: {date_string}\n"
+                    f"Page: {page}\n"
+                    f"URL: {FRIEND_API_URL}\n"
+                    f"Error: {last_error}"
+                )
+
+            if isinstance(payload, list):
+                records = payload
+                pagination = {
+                    "has_next": False,
+                    "total_pages": 1,
+                }
+
+            elif isinstance(payload, dict):
+                if isinstance(payload.get("data"), list):
+                    records = payload["data"]
+                elif isinstance(payload.get("raw_fares"), list):
+                    records = payload["raw_fares"]
+                elif isinstance(payload.get("fares"), list):
+                    records = payload["fares"]
+                else:
+                    records = []
+
+                pagination = payload.get("pagination") or {}
+
+            else:
+                records = []
+                pagination = {}
+
+            all_records.extend(records)
+
+            has_next = bool(
+                pagination.get("has_next", False)
+            )
+
+            total_pages = int(
+                pagination.get("total_pages") or 1
+            )
+
+            if not has_next and page >= total_pages:
+                break
+
+            page += 1
+
+        current_date += timedelta(days=1)
+
+    if not all_records:
+        return pd.DataFrame()
+
+    return _normalise_observation_columns(
+        pd.DataFrame(all_records)
+    )
 
 def load_clean_data(mode: str = "real") -> pd.DataFrame:
     """
@@ -317,16 +588,39 @@ def load_clean_data(mode: str = "real") -> pd.DataFrame:
         # 1. Local dashboard dataset
         # --------------------------------------------------------
         preferred_paths = [
-            REAL_DIR / "dashboard_airfare_observations.csv",
-            REAL_DIR / "clean_airfare_observations.csv",
-        ]
+    REAL_DIR / "dashboard_airfare_observations.parquet",
+    REAL_DIR / "dashboard_airfare_observations.csv",
+    REAL_DIR / "clean_airfare_observations.parquet",
+    REAL_DIR / "clean_airfare_observations.csv",
+]
 
         for path in preferred_paths:
             if path.exists():
-                return _normalise_observation_columns(
-                    pd.read_csv(path)
+
+                if path.suffix.lower() == ".parquet":
+                    return _normalise_observation_columns(
+                pd.read_parquet(path)
+            )
+
+        return _normalise_observation_columns(
+            pd.read_csv(path)
+        )
+        # --------------------------------------------------------
+        # 2. Cloudflare R2 processed Parquet
+        # --------------------------------------------------------
+        if _r2_enabled():
+            try:
+                r2_df = _read_r2_dataframe(
+                    R2_CLEAN_PARQUET_KEY
                 )
 
+                if not r2_df.empty:
+                    return _normalise_observation_columns(
+                        r2_df
+                    )
+
+            except Exception:
+                pass
         # --------------------------------------------------------
         # 2. Local raw JSON
         # --------------------------------------------------------
@@ -363,24 +657,39 @@ def load_clean_data(mode: str = "real") -> pd.DataFrame:
 
 def load_daily_index(mode: str = "real") -> pd.DataFrame:
     if mode.lower() == "real":
-        path = _index_path(
-            "real",
-            "real_daily_airfare_index.csv",
-        )
+
+        remote_key = "index/real_daily_airfare_index.csv"
+
+        if _r2_enabled() and _r2_object_exists(remote_key):
+            df = _read_r2_dataframe(remote_key)
+
+        else:
+            path = _index_path(
+                "real",
+                "real_daily_airfare_index.csv",
+            )
+
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"Daily index file not found locally or in R2:\n{path}"
+                )
+
+            df = pd.read_csv(path)
+
     else:
         path = _index_path(
             "synthetic",
             "daily_airfare_index.csv",
         )
 
-    if not path.exists():
-        raise FileNotFoundError(
-            f"Daily index file not found:\n{path}"
-        )
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Daily index file not found:\n{path}"
+            )
 
-    return _normalise_daily_index_columns(
-        pd.read_csv(path)
-    )
+        df = pd.read_csv(path)
+
+    return _normalise_daily_index_columns(df)
 
 
 # ============================================================
@@ -389,22 +698,37 @@ def load_daily_index(mode: str = "real") -> pd.DataFrame:
 
 def load_route_indices(mode: str = "real") -> pd.DataFrame:
     if mode.lower() == "real":
-        path = _index_path(
-            "real",
-            "real_route_indices.csv",
-        )
+
+        remote_key = "index/real_route_indices.csv"
+
+        if _r2_enabled() and _r2_object_exists(remote_key):
+            df = _read_r2_dataframe(remote_key)
+
+        else:
+            path = _index_path(
+                "real",
+                "real_route_indices.csv",
+            )
+
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"Route index file not found locally or in R2:\n{path}"
+                )
+
+            df = pd.read_csv(path)
+
     else:
         path = _index_path(
             "synthetic",
             "route_indices.csv",
         )
 
-    if not path.exists():
-        raise FileNotFoundError(
-            f"Route index file not found:\n{path}"
-        )
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Route index file not found:\n{path}"
+            )
 
-    df = pd.read_csv(path)
+        df = pd.read_csv(path)
 
     if "collection_date" in df.columns:
         df["collection_date"] = pd.to_datetime(
@@ -422,25 +746,41 @@ def load_route_indices(mode: str = "real") -> pd.DataFrame:
 def load_advance_window_indices(
     mode: str = "real",
 ) -> pd.DataFrame:
+
     if mode.lower() == "real":
-        path = _index_path(
-            "real",
-            "real_lead_time_contributions.csv",
-        )
+
+        remote_key = "index/real_lead_time_contributions.csv"
+
+        if _r2_enabled() and _r2_object_exists(remote_key):
+            df = _read_r2_dataframe(remote_key)
+
+        else:
+            path = _index_path(
+                "real",
+                "real_lead_time_contributions.csv",
+            )
+
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"Lead-time index file not found locally or in R2:\n{path}"
+                )
+
+            df = pd.read_csv(path)
+
     else:
         path = _index_path(
             "synthetic",
             "advance_window_indices.csv",
         )
 
-    if not path.exists():
-        raise FileNotFoundError(
-            f"Lead-time index file not found:\n{path}"
-        )
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Lead-time index file not found:\n{path}"
+            )
 
-    return _normalise_lead_time_columns(
-        pd.read_csv(path)
-    )
+        df = pd.read_csv(path)
+
+    return _normalise_lead_time_columns(df)
 
 
 # ============================================================
