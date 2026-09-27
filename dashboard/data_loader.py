@@ -567,71 +567,76 @@ def _load_friend_api_observations() -> pd.DataFrame:
 
 def load_clean_data(mode: str = "real") -> pd.DataFrame:
     """
-    Load the dashboard observation universe.
+    Load the dashboard observation dataset.
 
-    REAL DATA PRIORITY:
-
-    1. dashboard_airfare_observations.csv
-    2. clean_airfare_observations.csv
-    3. local raw airfare_index.json
-    4. Friend API
-
-    The Friend API is used only when the deployed environment does
-    not contain the large generated local datasets.
-
-    Local development therefore continues using the existing
-    processed dataset without changing the statistical pipeline.
+    Priority for REAL data:
+      1. Cloudflare R2 processed Parquet
+      2. Local processed Parquet/CSV
+      3. Local raw JSON
+      4. Cloudflare R2 raw JSON
+      5. Friend API
     """
+
     if mode.lower() == "real":
 
         # --------------------------------------------------------
-        # 1. Local dashboard dataset
+        # 1. CLOUDflare R2 — PRIMARY DEPLOYED DATA SOURCE
+        # --------------------------------------------------------
+        if _r2_enabled():
+            try:
+                r2_df = _read_r2_dataframe(
+                    "processed/clean_airfare_observations.parquet"
+                )
+
+                if not r2_df.empty:
+                    return _normalise_observation_columns(r2_df)
+
+            except Exception as exc:
+                raise RuntimeError(
+                    "Cloudflare R2 is configured but the clean "
+                    "Parquet dataset could not be loaded.\n"
+                    f"Bucket: {R2_BUCKET}\n"
+                    f"Object: processed/clean_airfare_observations.parquet\n"
+                    f"Error: {exc}"
+                ) from exc
+
+        # --------------------------------------------------------
+        # 2. LOCAL processed data — mainly for local development
         # --------------------------------------------------------
         preferred_paths = [
-    REAL_DIR / "dashboard_airfare_observations.parquet",
-    REAL_DIR / "dashboard_airfare_observations.csv",
-    REAL_DIR / "clean_airfare_observations.parquet",
-    REAL_DIR / "clean_airfare_observations.csv",
-]
+            REAL_DIR / "dashboard_airfare_observations.parquet",
+            REAL_DIR / "dashboard_airfare_observations.csv",
+            REAL_DIR / "clean_airfare_observations.parquet",
+            REAL_DIR / "clean_airfare_observations.csv",
+        ]
 
         for path in preferred_paths:
             if path.exists():
 
                 if path.suffix.lower() == ".parquet":
                     return _normalise_observation_columns(
-                pd.read_parquet(path)
-            )
+                        pd.read_parquet(path)
+                    )
 
-        return _normalise_observation_columns(
-            pd.read_csv(path)
-        )
-        # --------------------------------------------------------
-        # 2. Cloudflare R2 processed Parquet
-        # --------------------------------------------------------
-        if _r2_enabled():
-            try:
-                r2_df = _read_r2_dataframe(
-                    R2_CLEAN_PARQUET_KEY
+                return _normalise_observation_columns(
+                    pd.read_csv(path)
                 )
 
-                if not r2_df.empty:
-                    return _normalise_observation_columns(
-                        r2_df
-                    )
+        # --------------------------------------------------------
+        # 3. Local / R2 raw JSON
+        # --------------------------------------------------------
+        if RAW_JSON_PATH.exists() or _r2_enabled():
+            try:
+                raw_df = load_raw_observations()
+
+                if not raw_df.empty:
+                    return raw_df
 
             except Exception:
                 pass
-        # --------------------------------------------------------
-        # 2. Local raw JSON
-        # --------------------------------------------------------
-        if RAW_JSON_PATH.exists():
-            raw_df = load_raw_observations()
-
-            if not raw_df.empty:
-                return raw_df
 
         # --------------------------------------------------------
-        # 3. Friend API fallback
+        # 4. Friend API fallback
         # --------------------------------------------------------
         return _load_friend_api_observations()
 
