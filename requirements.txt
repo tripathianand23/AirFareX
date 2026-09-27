@@ -34,3 +34,4 @@ python-dotenv
 pytest
 
 boto3
+pyarrow
