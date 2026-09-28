@@ -35,3 +35,4 @@ pytest
 
 boto3
 pyarrow
+duckdb

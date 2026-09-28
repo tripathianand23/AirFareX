@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import os
+import sys
+import json
+import base64
+from pathlib import Path
+
 # ============================================================
 # AIRFARE PRICE INDEX — REAL-DATA STATISTICAL OPERATIONS APP
 # SIH 2026 | Problem Statement 26056
@@ -20,11 +26,6 @@ from __future__ import annotations
 # - "PUBLISHABLE" is driven by the automated audit output.
 # ============================================================
 
-import sys
-import json
-import base64
-from pathlib import Path
-
 # Make project root importable when Streamlit executes this file directly.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -34,6 +35,19 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+
+from dashboard.observation_store import (
+    observation_metadata,
+    observation_dimensions,
+    query_observations,
+    source_summary,
+    route_summary,
+    lead_time_summary,
+    route_lead_summary,
+    data_quality_summary,
+)
+
+
 
 from dashboard.data_loader import (
     load_clean_data,
@@ -426,12 +440,11 @@ st.markdown(
 
 @st.cache_data(show_spinner="Loading real statistical datasets...")
 def load_dashboard_data():
-    clean = load_clean_data()
-    raw = load_raw_observations()
     daily = load_daily_index()
     routes = load_route_indices()
     lead = load_advance_window_indices()
-    return clean, raw, daily, routes, lead
+
+    return daily, routes, lead
 
 
 @st.cache_data(show_spinner=False)
@@ -546,7 +559,65 @@ def normalize_lead_index(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-clean_data, raw_data, daily_index, route_indices, advance_indices = load_dashboard_data()
+daily_index, route_indices, advance_indices = (
+    load_dashboard_data()
+)
+
+observation_meta = observation_metadata()
+observation_dims = observation_dimensions()
+
+@st.cache_data(
+    ttl=900,
+    show_spinner=False,
+)
+def observation_metadata():
+    conn = _connection()
+
+    result = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS observations,
+            COUNT(
+                DISTINCT
+                CASE
+                    WHEN origin IS NOT NULL
+                     AND destination IS NOT NULL
+                    THEN UPPER(
+                        TRIM(origin)
+                        || '-'
+                        || TRIM(destination)
+                    )
+                END
+            ) AS routes,
+            COUNT(DISTINCT airline) AS airlines,
+            COUNT(DISTINCT source) AS sources,
+            MIN(collection_timestamp) AS min_timestamp,
+            MAX(collection_timestamp) AS max_timestamp
+        FROM observations
+        """
+    ).fetchone()
+
+    observations = int(result[0] or 0)
+    routes = int(result[1] or 0)
+    airlines = int(result[2] or 0)
+    sources = int(result[3] or 0)
+    min_timestamp = result[4]
+    max_timestamp = result[5]
+
+    return {
+        "observations": observations,
+        "routes": routes,
+        "airlines": airlines,
+        "sources": sources,
+        "min_timestamp": min_timestamp,
+        "max_timestamp": max_timestamp,
+
+        "total_observations": observations,
+        "first_collection": min_timestamp,
+        "last_collection": max_timestamp,
+    }
+clean_data = pd.DataFrame()
+raw_data = pd.DataFrame()
 audit_data, coverage_data, metadata, pipeline_report = load_real_artifacts()
 
 daily_index = normalize_daily_index(daily_index)
@@ -783,39 +854,43 @@ def render_status_chip(
 
 
 def audit_latest_status() -> dict:
-    """Return the latest audit row for the latest collection date."""
+    """Return the latest publishable audit row.
 
+    An incomplete latest collection day may be HOLD while the most recent
+    complete/publishable day remains valid. The audit command center reports
+    the latest publishable audit rather than treating an expected HOLD day
+    as a historical pipeline failure.
+    """
     if audit_data.empty:
         return {}
 
     out = audit_data.copy()
 
-    date_col = next(
-        (
-            c
-            for c in [
-                "collection_date",
-                "date",
-            ]
-            if c in out.columns
-        ),
-        None,
-    )
+    if "collection_date" in out.columns:
+        out["collection_date"] = pd.to_datetime(
+            out["collection_date"], errors="coerce"
+        )
 
-    if date_col is None:
-        return {}
+    out = out.sort_values("collection_date")
 
-    out["_date"] = pd.to_datetime(
-        out[date_col],
-        errors="coerce",
-    )
+    if "publication_status" in out.columns:
+        publishable = out[
+            out["publication_status"]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            .eq("PUBLISHABLE")
+        ]
 
-    out = out.dropna(subset=["_date"]).sort_values("_date")
+        if not publishable.empty:
+            row = publishable.iloc[-1].to_dict()
+        else:
+            row = out.iloc[-1].to_dict()
+    else:
+        row = out.iloc[-1].to_dict()
 
-    if out.empty:
-        return {}
+    return row
 
-    return out.iloc[-1].to_dict()
 
 
 def bool_value(row: dict, key: str) -> bool | None:
@@ -830,7 +905,9 @@ def bool_value(row: dict, key: str) -> bool | None:
     if isinstance(value, bool):
         return value
 
-    if str(value).strip().lower() in {
+    normalized = str(value).strip().lower()
+
+    if normalized in {
         "true",
         "1",
         "yes",
@@ -839,7 +916,7 @@ def bool_value(row: dict, key: str) -> bool | None:
     }:
         return True
 
-    if str(value).strip().lower() in {
+    if normalized in {
         "false",
         "0",
         "no",
@@ -915,14 +992,67 @@ st.sidebar.divider()
 
 # Observation filters should cover the complete scraped observation
 # universe, not only the dates for which a precomputed index exists.
-valid_dates = (
-    pd.to_datetime(
-        clean_data["collection_timestamp"],
-        errors="coerce",
-    )
-    .dropna()
-    if "collection_timestamp" in clean_data.columns
-    else pd.Series(dtype="datetime64[ns]")
+valid_min = observation_meta["min_timestamp"]
+valid_max = observation_meta["max_timestamp"]
+
+# Build available collection dates from DuckDB metadata
+valid_min_date = pd.to_datetime(
+    valid_min,
+    errors="coerce",
+).date()
+
+valid_max_date = pd.to_datetime(
+    valid_max,
+    errors="coerce",
+).date()
+
+valid_dates = pd.date_range(
+    start=valid_min_date,
+    end=valid_max_date,
+    freq="D",
+)
+
+min_date = (
+    pd.Timestamp(valid_min).date()
+    if valid_min is not None
+    else None
+)
+
+max_date = (
+    pd.Timestamp(valid_max).date()
+    if valid_max is not None
+    else None
+)
+
+if min_date and max_date:
+    selected_dates = st.sidebar.date_input(
+        "Collection date range",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date,
+        key="sidebar_collection_date_range",
+)
+    
+else:
+    selected_dates = None
+
+available_routes = observation_dims["routes"]
+available_airlines = observation_dims["airlines"]
+available_sources = observation_dims["sources"]
+
+selected_routes = st.sidebar.multiselect(
+    "Routes",
+    available_routes,
+)
+
+selected_airlines = st.sidebar.multiselect(
+    "Airlines",
+    available_airlines,
+)
+
+selected_sources = st.sidebar.multiselect(
+    "Sources",
+    available_sources,
 )
 
 if not valid_dates.empty:
@@ -1188,9 +1318,21 @@ with pages[0]:
             30,
         )
 
-        quality = calculate_data_quality(
-            filtered_clean
-        )
+        quality = data_quality_summary(
+    start_date=(
+        selected_dates[0]
+        if selected_dates and len(selected_dates) == 2
+        else None
+    ),
+    end_date=(
+        selected_dates[1]
+        if selected_dates and len(selected_dates) == 2
+        else None
+    ),
+    routes=selected_routes or None,
+    airlines=selected_airlines or None,
+    sources=selected_sources or None,
+)
 
         quality_score = max(
             0.0,
@@ -1219,22 +1361,22 @@ with pages[0]:
 
         c3.metric(
             "Total Observations",
-            f"{observation_count(clean_data):,}",
+            f"{observation_meta["observations"]:,}",
         )
 
         c4.metric(
             "Total Routes",
-            f"{route_count(clean_data):,}",
+            f"{observation_meta["routes"]:,}",
         )
 
         c5.metric(
             "Total Airlines",
-            f"{airline_count(clean_data):,}",
+            f"{observation_meta["airlines"]:,}",
         )
 
         c6.metric(
             "Total Sources",
-            f"{source_count(clean_data):,}",
+            f"{observation_meta["sources"]:,}",
         )
 
         st.markdown(
@@ -1361,135 +1503,178 @@ with pages[0]:
                         {"collection_date": "Collection Date", "advance_days": "Advance Days", "airfare_index": "Airfare Index"},
                     )
 
-        # --------------------------------------------------------
-        # Source coverage + data quality
-        # --------------------------------------------------------
-        left, right = st.columns([1.15, .85])
+            # --------------------------------------------------------
+    # Source coverage + data quality
+    # --------------------------------------------------------
+    left, right = st.columns([1.15, .85])
 
-        with left:
-            st.markdown("### Source Coverage")
+    with left:
+        st.markdown("### Source Coverage")
 
-            source_values = (
-                filtered_clean["source"].dropna().astype(str)
-                if "source" in filtered_clean.columns
-                else pd.Series(dtype=str)
+        source_summary_df = source_summary(
+            start_date=(
+                selected_dates[0]
+                if selected_dates and len(selected_dates) == 2
+                else None
+            ),
+            end_date=(
+                selected_dates[1]
+                if selected_dates and len(selected_dates) == 2
+                else None
+            ),
+            routes=selected_routes or None,
+            airlines=selected_airlines or None,
+            sources=selected_sources or None,
+        )
+
+        if not source_summary_df.empty:
+            source_df = source_summary_df.copy()
+
+            source_fig = px.pie(
+                source_df,
+                names="source",
+                values="observations",
+                hole=.58,
             )
-            source_counts = source_values.value_counts()
 
-            if not source_counts.empty:
-                source_df = (
-                    source_counts
-                    .rename("observations")
-                    .reset_index()
-                )
-                source_df.columns = ["source", "observations"]
-
-                source_fig = px.pie(
-                    source_df,
-                    names="source",
-                    values="observations",
-                    hole=.58,
-                )
-                source_fig.update_traces(
-                    textposition="inside",
-                    textinfo="percent",
-                    hovertemplate="%{label}<br>%{value:,} observations<extra></extra>",
-                )
-                source_fig.update_layout(
-                    height=330,
-                    margin=dict(l=5, r=5, t=10, b=10),
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    showlegend=True,
-                    legend=dict(orientation="v"),
-                )
-                st.plotly_chart(
-                    source_fig,
-                    use_container_width=True,
-                    key="overview_source_coverage",
-                )
-                source_table = source_df.copy()
-                source_table["share_pct"] = source_table["observations"] / source_table["observations"].sum() * 100
-                display_chart_data_table(
-                    "Source Coverage Data",
-                    source_table[["source", "observations", "share_pct"]],
-                    {"source": "Source", "observations": "Observations", "share_pct": "Share (%)"},
-                )
-            else:
-                st.info("No source observations available for the selected filters.")
-
-        with right:
-            st.markdown("### Data Quality")
-
-            quality_fig = go.Figure(
-                go.Indicator(
-                    mode="gauge+number",
-                    value=quality_score,
-                    number={"suffix": "%", "font": {"size": 34}},
-                    title={"text": "Valid observations"},
-                    gauge={
-                        "axis": {"range": [0, 100]},
-                        "bar": {"thickness": .22},
-                        "steps": [
-                            {"range": [0, 80], "color": "#e7edf3"},
-                            {"range": [80, 95], "color": "#dfeaf4"},
-                            {"range": [95, 100], "color": "#d8eadf"},
-                        ],
-                        "threshold": {
-                            "line": {"width": 3},
-                            "thickness": .75,
-                            "value": quality_score,
-                        },
-                    },
-                )
+            source_fig.update_traces(
+                textposition="inside",
+                textinfo="percent",
+                hovertemplate=(
+                    "%{label}<br>"
+                    "%{value:,} observations"
+                    "<extra></extra>"
+                ),
             )
-            quality_fig.update_layout(
-                height=250,
-                margin=dict(l=20, r=20, t=25, b=5),
-                paper_bgcolor="rgba(0,0,0,0)",
-            )
+
             st.plotly_chart(
-                quality_fig,
+                source_fig,
                 use_container_width=True,
-                key="overview_quality_gauge",
             )
-            quality_table = pd.DataFrame([
-                {
-                    "Metric": "Valid observations",
-                    "Value": f"{quality_score:.2f}%",
-                    "Description": "100% minus missing-fare and duplicate rates",
+        else:
+            st.info(
+                "No source observations available "
+                "for the selected filters."
+            )
+
+    with right:
+        st.markdown("### Data Quality")
+
+        quality_fig = go.Figure(
+            go.Indicator(
+                mode="gauge+number",
+                value=quality_score,
+                number={
+                    "suffix": "%",
+                    "font": {"size": 34},
                 },
-                {
-                    "Metric": "Missing fare",
-                    "Value": f"{float(quality.get('missing_fare_pct', 0) or 0):.2f}%",
-                    "Description": "Share of observations without a valid fare",
+                title={
+                    "text": "Valid observations"
                 },
-                {
-                    "Metric": "Duplicate rate",
-                    "Value": f"{float(quality.get('duplicate_pct', 0) or 0):.2f}%",
-                    "Description": "Share identified as duplicate observations",
+                gauge={
+                    "axis": {
+                        "range": [0, 100]
+                    },
+                    "bar": {
+                        "thickness": .22
+                    },
+                    "steps": [
+                        {
+                            "range": [0, 80],
+                            "color": "#e7edf3",
+                        },
+                        {
+                            "range": [80, 95],
+                            "color": "#dfeaf4",
+                        },
+                        {
+                            "range": [95, 100],
+                            "color": "#d8eadf",
+                        },
+                    ],
+                    "threshold": {
+                        "line": {
+                            "width": 3
+                        },
+                        "thickness": .75,
+                        "value": quality_score,
+                    },
                 },
-            ])
-            display_chart_data_table("Data Quality Data", quality_table)
-
-            qa1, qa2, qa3 = st.columns(3)
-            qa1.metric(
-                "Missing",
-                f"{float(quality.get('missing_fare_pct', 0) or 0):.1f}%",
             )
-            qa2.metric(
-                "Duplicates",
-                f"{float(quality.get('duplicate_pct', 0) or 0):.1f}%",
-            )
-            qa3.metric(
-                "Quality",
-                f"{quality_score:.1f}%",
-            )
+        )
 
+        quality_fig.update_layout(
+            height=250,
+            margin=dict(
+                l=20,
+                r=20,
+                t=25,
+                b=5,
+            ),
+            paper_bgcolor="rgba(0,0,0,0)",
+        )
 
+        st.plotly_chart(
+            quality_fig,
+            use_container_width=True,
+            key="overview_quality_gauge",
+        )
 
-# ============================================================
-# INDEX ANALYTICS
-# ============================================================
+        quality_table = pd.DataFrame([
+            {
+                "Metric": "Valid observations",
+                "Value": f"{quality_score:.2f}%",
+                "Description": (
+                    "100% minus missing-fare "
+                    "and duplicate rates"
+                ),
+            },
+            {
+                "Metric": "Missing fare",
+                "Value": (
+                    f"{float(quality.get('missing_fare_pct', 0) or 0):.2f}%"
+                ),
+                "Description": (
+                    "Share of observations without "
+                    "a valid fare"
+                ),
+            },
+            {
+                "Metric": "Duplicate rate",
+                "Value": (
+                    f"{float(quality.get('duplicate_pct', 0) or 0):.2f}%"
+                ),
+                "Description": (
+                    "Share identified as duplicate "
+                    "observations"
+                ),
+            },
+        ])
+
+        display_chart_data_table(
+            "Data Quality Data",
+            quality_table,
+        )
+
+        qa1, qa2, qa3 = st.columns(3)
+
+        qa1.metric(
+            "Missing",
+            f"{float(quality.get('missing_fare_pct', 0) or 0):.1f}%",
+        )
+
+        qa2.metric(
+            "Duplicates",
+            f"{float(quality.get('duplicate_pct', 0) or 0):.1f}%",
+        )
+
+        qa3.metric(
+            "Quality",
+            f"{quality_score:.1f}%",
+        )
+    # ============================================================
+    # INDEX ANALYTICS
+    # ============================================================
 
 with pages[1]:
     st.subheader("Index Analytics")
@@ -1673,20 +1858,50 @@ with pages[2]:
                 hide_index=True,
             )
 
-        st.subheader(
+            st.subheader(
             "Route × Lead-Time Observed Fare Structure"
         )
 
-        heatmap_data = build_route_lead_heatmap(
-            filtered_clean
+        route_lead_df = route_lead_summary(
+            start_date=(
+                selected_dates[0]
+                if selected_dates and len(selected_dates) == 2
+                else None
+            ),
+            end_date=(
+                selected_dates[1]
+                if selected_dates and len(selected_dates) == 2
+                else None
+            ),
+            routes=selected_routes or None,
+            airlines=selected_airlines or None,
+            sources=selected_sources or None,
         )
 
-        if heatmap_data.empty:
+        if route_lead_df.empty:
             st.info(
                 "Insufficient fare observations "
                 "for the route × lead-time matrix."
             )
         else:
+            heatmap_data = (
+                route_lead_df
+                .pivot(
+                    index="route",
+                    columns="advance_days",
+                    values="median_fare",
+                )
+                .sort_index()
+            )
+
+            heatmap_data = heatmap_data.reindex(
+                columns=[
+                    c
+                    for c in [1, 7, 15, 30, 45]
+                    if c in heatmap_data.columns
+                ]
+            )
+
             heatmap = px.imshow(
                 heatmap_data,
                 text_auto=".0f",
@@ -1717,18 +1932,39 @@ with pages[2]:
                 key="route_lead_heatmap",
             )
 
-            heatmap_table = heatmap_data.reset_index()
-            display_chart_data_table("Route × Lead-Time Fare Data", heatmap_table)
+            heatmap_table = (
+                heatmap_data
+                .reset_index()
+            )
+
+            display_chart_data_table(
+                "Route × Lead-Time Fare Data",
+                heatmap_table,
+            )
 
             st.caption(
                 "Exploratory median fare matrix. It is not a second "
                 "national-index calculation."
             )
 
-        st.subheader("Observed Route Coverage")
+        st.subheader(
+            "Observed Route Coverage"
+        )
 
-        coverage = calculate_route_coverage(
-            filtered_clean
+        coverage = route_summary(
+            start_date=(
+                selected_dates[0]
+                if selected_dates and len(selected_dates) == 2
+                else None
+            ),
+            end_date=(
+                selected_dates[1]
+                if selected_dates and len(selected_dates) == 2
+                else None
+            ),
+            routes=selected_routes or None,
+            airlines=selected_airlines or None,
+            sources=selected_sources or None,
         )
 
         if coverage.empty:
@@ -1736,8 +1972,29 @@ with pages[2]:
                 "No route coverage data available."
             )
         else:
+            coverage_display = coverage.rename(
+                columns={
+                    "route": "Route",
+                    "observations": "Observations",
+                    "median_fare": "Median Fare (INR)",
+                    "mean_fare": "Mean Fare (INR)",
+                }
+            ).copy()
+
+            coverage_display[
+                "Median Fare (INR)"
+            ] = coverage_display[
+                "Median Fare (INR)"
+            ].round(2)
+
+            coverage_display[
+                "Mean Fare (INR)"
+            ] = coverage_display[
+                "Mean Fare (INR)"
+            ].round(2)
+
             st.dataframe(
-                coverage,
+                coverage_display,
                 use_container_width=True,
                 hide_index=True,
             )
@@ -1772,9 +2029,27 @@ with pages[3]:
         )
 
         lead_chart_table = filtered_advance.copy()
-        keep = [c for c in ["collection_date", "advance_days", "airfare_index"] if c in lead_chart_table.columns]
+
+        keep = [
+            c
+            for c in [
+                "collection_date",
+                "advance_days",
+                "airfare_index",
+            ]
+            if c in lead_chart_table.columns
+        ]
+
         if keep:
-            display_chart_data_table("Lead-Time Chart Data", lead_chart_table.tail(50)[keep], {"collection_date": "Collection Date", "advance_days": "Advance Days", "airfare_index": "Airfare Index"})
+            display_chart_data_table(
+                "Lead-Time Chart Data",
+                lead_chart_table.tail(50)[keep],
+                {
+                    "collection_date": "Collection Date",
+                    "advance_days": "Advance Days",
+                    "airfare_index": "Airfare Index",
+                },
+            )
 
         if {
             "advance_days",
@@ -1794,8 +2069,7 @@ with pages[3]:
                 ].max()
 
                 snapshot = snapshot[
-                    snapshot["collection_date"]
-                    == latest_date
+                    snapshot["collection_date"] == latest_date
                 ]
 
             snapshot["advance_days"] = pd.to_numeric(
@@ -1817,9 +2091,10 @@ with pages[3]:
 
             snapshot = (
                 snapshot
-                .groupby("advance_days", as_index=False)[
-                    "airfare_index"
-                ]
+                .groupby(
+                    "advance_days",
+                    as_index=False,
+                )["airfare_index"]
                 .median()
                 .sort_values("advance_days")
             )
@@ -1840,65 +2115,90 @@ with pages[3]:
                     hide_index=True,
                 )
 
+        # --------------------------------------------------------
+        # Observed Fare Distribution by Lead Time
+        # --------------------------------------------------------
+
         st.subheader(
             "Observed Fare Distribution by Lead Time"
         )
 
-        if {
-            "advance_days",
-            "total_fare",
-        }.issubset(filtered_clean.columns):
+        lead_summary = lead_time_summary(
+            start_date=(
+                selected_dates[0]
+                if selected_dates
+                and len(selected_dates) == 2
+                else None
+            ),
+            end_date=(
+                selected_dates[1]
+                if selected_dates
+                and len(selected_dates) == 2
+                else None
+            ),
+            routes=selected_routes or None,
+            airlines=selected_airlines or None,
+            sources=selected_sources or None,
+        )
 
-            lead_fares = filtered_clean.copy()
-
-            lead_fares["advance_days"] = pd.to_numeric(
-                lead_fares["advance_days"],
-                errors="coerce",
+        if lead_summary.empty:
+            st.info(
+                "No lead-time fare observations available "
+                "for the selected filters."
+            )
+        else:
+            lead_fare_fig = px.bar(
+                lead_summary,
+                x="advance_days",
+                y="median_fare",
+                text="median_fare",
+                labels={
+                    "advance_days": "Advance Days",
+                    "median_fare": "Median Fare (INR)",
+                },
             )
 
-            lead_fares["total_fare"] = pd.to_numeric(
-                lead_fares["total_fare"],
-                errors="coerce",
+            lead_fare_fig.update_traces(
+                texttemplate="₹%{text:,.0f}",
+                textposition="outside",
+                hovertemplate=(
+                    "Advance Days: %{x}<br>"
+                    "Median Fare: ₹%{y:,.0f}"
+                    "<extra></extra>"
+                ),
             )
 
-            lead_fares = lead_fares.dropna(
-                subset=[
-                    "advance_days",
-                    "total_fare",
-                ]
+            lead_fare_fig.update_layout(
+                height=380,
+                margin=dict(
+                    l=20,
+                    r=20,
+                    t=30,
+                    b=20,
+                ),
             )
 
-            if not lead_fares.empty:
-                lead_summary = (
-                    lead_fares
-                    .groupby("advance_days")["total_fare"]
-                    .agg(
-                        [
-                            "count",
-                            "median",
-                            "mean",
-                            "min",
-                            "max",
-                        ]
-                    )
-                    .reset_index()
-                    .sort_values("advance_days")
-                )
+            st.plotly_chart(
+                lead_fare_fig,
+                use_container_width=True,
+                key="observed_fare_distribution_by_lead_time",
+            )
 
-                st.dataframe(
-                    lead_summary.rename(
-                        columns={
-                            "advance_days": "Advance Days",
-                            "count": "Observations",
-                            "median": "Median Fare (INR)",
-                            "mean": "Mean Fare (INR)",
-                            "min": "Minimum Fare (INR)",
-                            "max": "Maximum Fare (INR)",
-                        }
-                    ).round(2),
-                    use_container_width=True,
-                    hide_index=True,
-                )
+            lead_fare_table = lead_summary.rename(
+                columns={
+                    "advance_days": "Advance Days",
+                    "observations": "Observations",
+                    "median_fare": "Median Fare (INR)",
+                    "mean_fare": "Mean Fare (INR)",
+                    "min_fare": "Minimum Fare (INR)",
+                    "max_fare": "Maximum Fare (INR)",
+                }
+            ).round(2)
+
+            display_chart_data_table(
+                "Observed Fare Distribution by Lead Time Data",
+                lead_fare_table,
+            )
 
         st.info(
             "**Interpretation caution:** differences across lead-time "
@@ -1906,8 +2206,6 @@ with pages[3]:
             "They should not be called demand elasticity without a "
             "proper longitudinal identification design."
         )
-
-
 # ============================================================
 # DATA QUALITY
 # ============================================================
@@ -1923,16 +2221,28 @@ with pages[4]:
         unsafe_allow_html=True,
     )
 
-    quality = calculate_data_quality(
-        filtered_clean
-    )
+    quality = data_quality_summary(
+    start_date=(
+        selected_dates[0]
+        if selected_dates and len(selected_dates) == 2
+        else None
+    ),
+    end_date=(
+        selected_dates[1]
+        if selected_dates and len(selected_dates) == 2
+        else None
+    ),
+    routes=selected_routes or None,
+    airlines=selected_airlines or None,
+    sources=selected_sources or None,
+)
 
     total_obs = int(
-        quality.get(
-            "total_observations",
-            len(filtered_clean),
-        )
+    quality.get(
+        "total_observations",
+        0,
     )
+)
 
     missing_pct = float(
         quality.get(
@@ -2047,21 +2357,92 @@ with pages[4]:
 
     st.subheader("Potential Fare Anomalies")
 
-    anomaly_data = detect_fare_anomalies(
-        filtered_clean
-    )
+    # Monitoring-only anomaly detection.
+    # Uses the canonical validated total_fare field and does not
+    # modify the underlying statistical dataset.
+    anomaly_data = load_clean_data().copy()
 
     if anomaly_data.empty:
         st.info(
             "No anomaly-monitoring data available."
         )
+    elif not {
+        "origin",
+        "destination",
+        "total_fare",
+    }.issubset(anomaly_data.columns):
+        st.warning(
+            "Anomaly monitoring requires origin, destination and total_fare."
+        )
     else:
-        anomaly_count = (
-            int(
-                anomaly_data["anomaly_flag"].sum()
+        anomaly_data["total_fare"] = pd.to_numeric(
+            anomaly_data["total_fare"],
+            errors="coerce",
+        )
+
+        anomaly_data = anomaly_data.dropna(
+            subset=[
+                "origin",
+                "destination",
+                "total_fare",
+            ]
+        ).copy()
+
+        anomaly_data["route"] = (
+            anomaly_data["origin"].astype(str)
+            + "_"
+            + anomaly_data["destination"].astype(str)
+        )
+
+        q1 = (
+            anomaly_data.groupby("route")["total_fare"]
+            .quantile(0.25)
+            .rename("q1")
+        )
+
+        q3 = (
+            anomaly_data.groupby("route")["total_fare"]
+            .quantile(0.75)
+            .rename("q3")
+        )
+
+        bounds = pd.concat(
+            [q1, q3],
+            axis=1,
+        )
+
+        bounds["iqr"] = (
+            bounds["q3"] - bounds["q1"]
+        )
+
+        bounds["lower_bound"] = (
+            bounds["q1"] - 1.5 * bounds["iqr"]
+        )
+
+        bounds["upper_bound"] = (
+            bounds["q3"] + 1.5 * bounds["iqr"]
+        )
+
+        anomaly_data = anomaly_data.join(
+            bounds[
+                [
+                    "lower_bound",
+                    "upper_bound",
+                ]
+            ],
+            on="route",
+        )
+
+        anomaly_data["anomaly_flag"] = (
+            (anomaly_data["total_fare"] < anomaly_data["lower_bound"])
+            | (
+                anomaly_data["total_fare"]
+                > anomaly_data["upper_bound"]
             )
-            if "anomaly_flag" in anomaly_data
-            else 0
+        )
+
+        anomaly_count = int(
+            anomaly_data["anomaly_flag"].sum()
         )
 
         anomaly_rate = (
@@ -2089,13 +2470,9 @@ with pages[4]:
             f"{len(anomaly_data):,}",
         )
 
-        flagged = (
-            anomaly_data[
-                anomaly_data["anomaly_flag"]
-            ].copy()
-            if "anomaly_flag" in anomaly_data
-            else pd.DataFrame()
-        )
+        flagged = anomaly_data[
+            anomaly_data["anomaly_flag"]
+        ].copy()
 
         if flagged.empty:
             st.success(
@@ -2118,7 +2495,6 @@ with pages[4]:
                     "advance_days",
                     "base_fare",
                     "taxes",
-                    "consumer_fare",
                     "total_fare",
                     "route",
                     "anomaly_flag",
@@ -2126,18 +2502,20 @@ with pages[4]:
                 if c in flagged.columns
             ]
 
-            anomaly_display = flagged[cols].head(100).copy()
-            anomaly_display = anomaly_display.rename(columns={
-                "base_fare": "Base Fare (INR)",
-                "taxes": "Taxes & Fees (INR)",
-                "consumer_fare": "Consumer Fare (INR)",
-                "total_fare": "Source Total (INR)",
-            })
-
-            st.caption(
-                "Consumer Fare = Base Fare + Taxes & Fees. "
-                "Source Total is retained separately for reconciliation."
+            anomaly_display = (
+                flagged[cols]
+                .head(100)
+                .copy()
             )
+
+            anomaly_display = anomaly_display.rename(
+                columns={
+                    "base_fare": "Base Fare (INR)",
+                    "taxes": "Taxes & Fees (INR)",
+                    "total_fare": "Source Total (INR)",
+                }
+            )
+
             st.dataframe(
                 anomaly_display,
                 use_container_width=True,
@@ -2149,92 +2527,139 @@ with pages[4]:
 # SOURCE HEALTH
 # ============================================================
 
+# ============================================================
+# SOURCE HEALTH
+# ============================================================
+
 with pages[5]:
+
     st.subheader("Source Health & Observation Coverage")
 
     st.markdown(
         '<div class="section-note">'
-        'This view reports observed source contribution from the processed '
-        'dataset. It does not fabricate API latency or source success rates.'
+        'This view reports observed source contribution from the '
+        'cloud-backed processed observation dataset. '
+        'It does not fabricate API latency or source success rates.'
         '</div>',
         unsafe_allow_html=True,
     )
 
-    if filtered_clean.empty:
+    # --------------------------------------------------------
+    # Cloud-backed source summary
+    # --------------------------------------------------------
+
+    source_summary_df = source_summary(
+        start_date=(
+            selected_dates[0]
+            if selected_dates and len(selected_dates) == 2
+            else None
+        ),
+        end_date=(
+            selected_dates[1]
+            if selected_dates and len(selected_dates) == 2
+            else None
+        ),
+        routes=selected_routes or None,
+        airlines=selected_airlines or None,
+        sources=selected_sources or None,
+    )
+
+    if source_summary_df.empty:
+
         st.info(
-            "No source observations available."
+            "No source observations available for the selected filters."
         )
+
     else:
-        source_values = (
-            filtered_clean["source"]
-            .dropna()
-            .astype(str)
-            if "source" in filtered_clean.columns
-            else pd.Series(dtype=str)
-        )
+
+        source_df = source_summary_df.copy()
+
+        # Ensure expected numeric type
+        source_df["observations"] = pd.to_numeric(
+            source_df["observations"],
+            errors="coerce",
+        ).fillna(0)
 
         observed_sources = int(
-            source_values.nunique()
+            source_df["source"].nunique()
         )
 
-        full_source_values = (
-            clean_data["source"]
-            .dropna()
-            .astype(str)
-            if "source" in clean_data.columns
-            else pd.Series(dtype=str)
+        # Use the complete cloud-backed dataset dimensions
+        try:
+            dimensions = observation_dimensions()
+
+            configured_sources = len(
+                dimensions.get("sources", [])
+            )
+
+        except Exception:
+            configured_sources = observed_sources
+
+        # Source shares
+        total_source_observations = int(
+            source_df["observations"].sum()
         )
 
-        configured_sources = int(
-            full_source_values.nunique()
-        )
-
-        latest_obs_date = (
-            pd.to_datetime(
-                filtered_clean["collection_timestamp"],
-                errors="coerce",
-            ).max()
-            if "collection_timestamp"
-            in filtered_clean.columns
-            else pd.NaT
-        )
-
-        earliest_obs_date = (
-            pd.to_datetime(
-                filtered_clean["collection_timestamp"],
-                errors="coerce",
-            ).min()
-            if "collection_timestamp"
-            in filtered_clean.columns
-            else pd.NaT
-        )
-
-        source_counts = (
-            source_values.value_counts()
-        )
-
-        source_share = (
-            source_counts
-            / source_counts.sum()
-            * 100
-            if not source_counts.empty
-            else pd.Series(dtype=float)
-        )
+        if total_source_observations > 0:
+            source_df["share_pct"] = (
+                source_df["observations"]
+                / total_source_observations
+                * 100
+            )
+        else:
+            source_df["share_pct"] = 0.0
 
         concentration = (
-            float(source_share.iloc[0])
-            if not source_share.empty
+            float(source_df["share_pct"].max())
+            if not source_df.empty
             else 0.0
         )
+
+        # ----------------------------------------------------
+        # Dataset metadata from DuckDB / R2
+        # ----------------------------------------------------
+
+        try:
+            observation_meta = observation_metadata()
+
+            total_observations = int(
+                observation_meta.get(
+                    "total_observations",
+                    observation_meta.get("observations", 0),
+                )
+                or 0
+            )
+
+            latest_timestamp = observation_meta.get(
+                "max_timestamp"
+            )
+
+            earliest_timestamp = observation_meta.get(
+                "min_timestamp"
+            )
+
+        except Exception:
+            total_observations = total_source_observations
+            latest_timestamp = None
+            earliest_timestamp = None
+
+        # ----------------------------------------------------
+        # KPI cards
+        # ----------------------------------------------------
 
         s1, s2, s3, s4 = st.columns(4)
 
         s1.metric(
+            "Total Observations",
+            f"{total_observations:,}",
+        )
+
+        s2.metric(
             "Observed Sources",
             f"{observed_sources}/{configured_sources}",
         )
 
-        s2.metric(
+        s3.metric(
             "Source Coverage",
             (
                 f"{observed_sources / configured_sources * 100:.1f}%"
@@ -2243,50 +2668,31 @@ with pages[5]:
             ),
         )
 
-        s3.metric(
+        s4.metric(
             "Largest Source Share",
             f"{concentration:.1f}%",
         )
 
-        s4.metric(
-            "Latest Observation",
-            (
-                str(latest_obs_date.date())
-                if pd.notna(latest_obs_date)
-                else "—"
-            ),
-        )
-
         st.divider()
 
-        left, right = st.columns(
-            [1.3, 1]
-        )
+        # ----------------------------------------------------
+        # Source observation share
+        # ----------------------------------------------------
+
+        left, right = st.columns([1.3, 1])
 
         with left:
+
             st.markdown(
                 "#### Observation Share by Source"
             )
 
-            source_df = (
-                source_counts
-                .rename("observations")
-                .reset_index()
-            )
-
-            source_df.columns = [
-                "source",
-                "observations",
-            ]
-
-            source_df["share_pct"] = (
-                source_df["observations"]
-                / source_df["observations"].sum()
-                * 100
-            )
+            source_chart_data = source_df[
+                ["source", "observations", "share_pct"]
+            ].copy()
 
             source_fig = px.bar(
-                source_df.sort_values(
+                source_chart_data.sort_values(
                     "observations"
                 ),
                 x="observations",
@@ -2322,26 +2728,40 @@ with pages[5]:
 
             display_chart_data_table(
                 "Observation Share Data",
-                source_df[["source", "observations", "share_pct"]],
-                {"source": "Source", "observations": "Observations", "share_pct": "Share (%)"},
+                source_chart_data,
+                {
+                    "source": "Source",
+                    "observations": "Observations",
+                    "share_pct": "Share (%)",
+                },
             )
 
+        # ----------------------------------------------------
+        # Source concentration
+        # ----------------------------------------------------
+
         with right:
+
             st.markdown(
                 "#### Source Concentration Signal"
             )
 
             if concentration > 80:
+
                 st.warning(
                     "Very high source concentration. "
                     "Independent observation channels should be added."
                 )
+
             elif concentration > 50:
+
                 st.warning(
                     "Source concentration is high. "
                     "Diversification would improve resilience."
                 )
+
             else:
+
                 st.success(
                     "No single source contributes more than half "
                     "of the observed records."
@@ -2350,10 +2770,10 @@ with pages[5]:
             st.metric(
                 "Observation Window",
                 (
-                    f"{earliest_obs_date.date()} → "
-                    f"{latest_obs_date.date()}"
-                    if pd.notna(earliest_obs_date)
-                    and pd.notna(latest_obs_date)
+                    f"{str(earliest_timestamp)[:10]} → "
+                    f"{str(latest_timestamp)[:10]}"
+                    if earliest_timestamp
+                    and latest_timestamp
                     else "—"
                 ),
             )
@@ -2363,66 +2783,44 @@ with pages[5]:
                 "formal reliability score."
             )
 
+        # ----------------------------------------------------
+        # Source coverage table
+        # ----------------------------------------------------
+
         st.subheader(
-            "Source × Route Observation Coverage"
+            "Source Coverage"
         )
 
-        if {
-            "source",
-            "route",
-        }.issubset(filtered_clean.columns):
+        coverage_table = source_df[
+            ["source", "observations", "share_pct"]
+        ].copy()
 
-            matrix = pd.crosstab(
-                filtered_clean["source"],
-                filtered_clean["route"],
-            )
-
-            if not matrix.empty:
-                fig = px.imshow(
-                    matrix,
-                    aspect="auto",
-                    text_auto=True,
-                    labels={
-                        "x": "Route",
-                        "y": "Source",
-                        "color": "Observations",
-                    },
-                )
-
-                fig.update_layout(
-                    height=max(
-                        350,
-                        45 * len(matrix) + 100,
-                    )
-                )
-
-                st.plotly_chart(
-                    fig,
-                    use_container_width=True,
-                    key="source_route_heatmap",
-                )
-
-                coverage_table = matrix.reset_index()
-                display_chart_data_table("Source × Route Coverage Data", coverage_table)
-
-        source_coverage = (
-            calculate_source_coverage(
-                filtered_clean
-            )
+        coverage_table = coverage_table.rename(
+            columns={
+                "source": "Source",
+                "observations": "Observations",
+                "share_pct": "Share (%)",
+            }
         )
 
-        if not source_coverage.empty:
-            st.dataframe(
-                source_coverage,
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        st.info(
-            "**No fake runtime health:** live collector health will be "
-            "displayed here only after actual collection-cycle telemetry "
-            "is connected to the ingestion service."
+        coverage_table["Share (%)"] = (
+            coverage_table["Share (%)"].round(2)
         )
+
+        st.dataframe(
+            coverage_table,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.info(
+        "**No fake runtime health:** live collector health will be "
+        "displayed here only after actual collection-cycle telemetry "
+        "is connected to the ingestion service."
+    )
+
+
+
 
 
 # ============================================================
@@ -2430,111 +2828,100 @@ with pages[5]:
 # ============================================================
 
 with pages[6]:
+
     st.subheader("Raw Airfare Data Explorer")
+
     st.markdown(
         '<div class="section-note">'
-        'This view reads the raw_fares section directly from ' 
-        '<code>data/raw/airfare_index.json</code>. No deduplication or ' 
-        'cleaning is applied here, so the raw observation count is preserved.'
+        'Raw observations are queried directly from the clean Parquet '
+        'store using paginated database-style access. '
+        'The complete dataset is never loaded into browser memory.'
         '</div>',
         unsafe_allow_html=True,
     )
 
-    raw_view = raw_data.copy()
+    page_size = st.selectbox(
+        "Rows per page",
+        [25, 50, 100, 250],
+        index=1,
+        key="raw_page_size",
+    )
 
-    if raw_view.empty:
-        st.warning("No raw airfare observations were found.")
+    page_number = st.number_input(
+        "Page",
+        min_value=1,
+        value=1,
+        step=1,
+        key="raw_page_number",
+    )
+
+    if selected_dates is not None and len(selected_dates) == 2:
+        raw_start, raw_end = selected_dates
     else:
-        r1, r2, r3, r4 = st.columns(4)
-        r1.metric("Raw Observations", f"{len(raw_view):,}")
-        r2.metric("Airlines", f"{raw_view['airline'].nunique():,}" if 'airline' in raw_view else "—")
-        r3.metric("Routes", f"{raw_view['route'].nunique():,}" if 'route' in raw_view else "—")
-        r4.metric("Sources", f"{raw_view['source'].nunique():,}" if 'source' in raw_view else "—")
+        raw_start = None
+        raw_end = None
 
-        st.markdown("#### Explore the complete raw observation set")
+    total_rows, raw_page = query_observations(
+        page=int(page_number),
+        page_size=int(page_size),
+        start_date=raw_start,
+        end_date=raw_end,
+        routes=selected_routes or None,
+        airlines=selected_airlines or None,
+        sources=selected_sources or None,
+    )
 
-        c1, c2, c3 = st.columns(3)
-        raw_routes = sorted(raw_view['route'].dropna().astype(str).unique()) if 'route' in raw_view else []
-        raw_airlines = sorted(raw_view['airline'].dropna().astype(str).unique()) if 'airline' in raw_view else []
-        raw_sources = sorted(raw_view['source'].dropna().astype(str).unique()) if 'source' in raw_view else []
+    total_pages = max(
+        1,
+        (total_rows + page_size - 1) // page_size,
+    )
 
-        route_filter = c1.multiselect("Route", raw_routes, key="raw_routes")
-        airline_filter = c2.multiselect("Airline", raw_airlines, key="raw_airlines")
-        source_filter = c3.multiselect("Source", raw_sources, key="raw_sources")
+    if page_number > total_pages:
+        st.info(
+            f"Page {page_number} is beyond the available "
+            f"{total_pages} pages."
+        )
+    else:
+        r1, r2, r3 = st.columns(3)
 
-        if route_filter:
-            raw_view = raw_view[raw_view['route'].isin(route_filter)]
-        if airline_filter:
-            raw_view = raw_view[raw_view['airline'].isin(airline_filter)]
-        if source_filter:
-            raw_view = raw_view[raw_view['source'].isin(source_filter)]
-
-        if 'collection_timestamp' in raw_view.columns and not raw_view.empty:
-            min_ts = raw_view['collection_timestamp'].min()
-            max_ts = raw_view['collection_timestamp'].max()
-            if pd.notna(min_ts) and pd.notna(max_ts):
-                date_range = st.date_input(
-                    "Collection date",
-                    value=(min_ts.date(), max_ts.date()),
-                    min_value=min_ts.date(),
-                    max_value=max_ts.date(),
-                    key="raw_date_range",
-                )
-                if isinstance(date_range, tuple) and len(date_range) == 2:
-                    start, end = date_range
-                    raw_view = raw_view[
-                        (raw_view['collection_timestamp'].dt.date >= start)
-                        & (raw_view['collection_timestamp'].dt.date <= end)
-                    ]
-
-        st.caption(
-            f"Showing {len(raw_view):,} matching observations. "
-            "The table is paginated for browser performance; no raw records are deleted."
+        r1.metric(
+            "Matching Observations",
+            f"{total_rows:,}",
         )
 
-        page_size = st.selectbox(
-            "Rows per page",
-            [25, 50, 100, 250, 500],
-            index=2,
-            key="raw_page_size",
-        )
-        total_pages = max(1, (len(raw_view) + page_size - 1) // page_size)
-        page_number = st.number_input(
+        r2.metric(
             "Page",
-            min_value=1,
-            max_value=total_pages,
-            value=1,
-            step=1,
-            key="raw_page_number",
+            f"{page_number:,} / {total_pages:,}",
         )
-        start = (int(page_number) - 1) * page_size
-        end = start + page_size
+
+        r3.metric(
+            "Rows Loaded",
+            f"{len(raw_page):,}",
+        )
 
         display_cols = [
-            'id', 'timestamp', 'route', 'airline', 'advance_window_days',
-            'base_fare', 'taxes_fees', 'consumer_fare', 'total_fare', 'ota_source'
+            c
+            for c in [
+                "collection_timestamp",
+                "origin",
+                "destination",
+                "airline",
+                "source",
+                "advance_days",
+                "base_fare",
+                "taxes",
+                "fees",
+                "total_fare",
+                "departure_time",
+                "flight_number",
+            ]
+            if c in raw_page.columns
         ]
-        display_cols = [c for c in display_cols if c in raw_view.columns]
-
-        page_df = raw_view.iloc[start:end][display_cols].copy()
-        page_df = page_df.rename(columns={
-            'advance_window_days': 'Advance Days',
-            'base_fare': 'Base Fare (INR)',
-            'taxes_fees': 'Taxes & Fees (INR)',
-            'consumer_fare': 'Consumer Fare (INR)',
-            'total_fare': 'Source Total (INR)',
-            'ota_source': 'Source',
-        })
 
         st.dataframe(
-            page_df,
+            raw_page[display_cols],
             use_container_width=True,
             hide_index=True,
-        )
-
-        st.info(
-            "Raw data is preserved separately from the clean statistical dataset. "
-            "The headline index continues to use the precomputed statistical artifacts."
         )
 
 
@@ -2841,3 +3228,5 @@ with pages[7]:
         "These are configured resilience rules. They are not presented "
         "as evidence that a retry event occurred in the current dataset."
     )
+
+    

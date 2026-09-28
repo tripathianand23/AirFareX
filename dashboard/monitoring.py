@@ -113,13 +113,11 @@ def detect_fare_anomalies(
     """
     Detect potentially anomalous fares using an IQR rule.
 
-    This is a monitoring flag only.
-
-    Genuine high fares must NOT automatically be deleted from
-    the statistical dataset.
+    Monitoring only. This function never modifies or deletes
+    observations from the statistical dataset.
     """
 
-    if df.empty:
+    if df is None or df.empty:
         return pd.DataFrame()
 
     required_columns = {
@@ -128,10 +126,33 @@ def detect_fare_anomalies(
         "total_fare",
     }
 
-    if not required_columns.issubset(df.columns):
+    missing = required_columns.difference(df.columns)
+
+    if missing:
+        print(
+            "Anomaly detector missing columns:",
+            sorted(missing),
+        )
         return pd.DataFrame()
 
     result = df.copy()
+
+    result["total_fare"] = pd.to_numeric(
+        result["total_fare"],
+        errors="coerce",
+    )
+
+    result["origin"] = result["origin"].astype(str)
+    result["destination"] = result["destination"].astype(str)
+
+    result = result.dropna(
+        subset=[
+            "total_fare",
+        ]
+    )
+
+    if result.empty:
+        return pd.DataFrame()
 
     result["route"] = (
         result["origin"]
@@ -139,10 +160,6 @@ def detect_fare_anomalies(
         + result["destination"]
     )
 
-    
-
-    # Calculate quartiles explicitly because groupby.agg
-    # with quantile requires separate handling.
     q1 = (
         result.groupby("route")["total_fare"]
         .quantile(0.25)
