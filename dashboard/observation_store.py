@@ -259,6 +259,7 @@ def observation_dimensions():
         """
     ).fetchdf()
 
+    conn.close()
     return {
         "routes": routes["route"].tolist(),
         "airlines": airlines["airline"].tolist(),
@@ -438,6 +439,7 @@ def query_observations(
         query_params,
     ).fetchdf()
 
+    conn.close()
     return int(total_rows), df
 # ============================================================
 # SOURCE SUMMARY
@@ -476,7 +478,7 @@ def source_summary(
         else "WHERE source IS NOT NULL"
     )
 
-    return conn.execute(
+    result = conn.execute(
         f"""
         SELECT
             source,
@@ -488,6 +490,8 @@ def source_summary(
         """,
         params,
     ).fetchdf()
+    conn.close()
+    return result
 
 # ============================================================
 # DATA QUALITY SUMMARY
@@ -631,7 +635,7 @@ def route_lead_summary(
             WHERE {extra_conditions}
         """
 
-    return conn.execute(
+    result = conn.execute(
         f"""
         SELECT
             UPPER(
@@ -653,6 +657,8 @@ def route_lead_summary(
         """,
         params,
     ).fetchdf()
+    conn.close()
+    return result
 
 
 # ============================================================
@@ -686,7 +692,7 @@ def lead_time_summary(
         sources=sources,
     )
 
-    return conn.execute(
+    result = conn.execute(
         f"""
         SELECT
             advance_days,
@@ -705,6 +711,8 @@ def lead_time_summary(
         """,
         params,
     ).fetchdf()
+    conn.close()
+    return result
 
 
 @st.cache_data(
@@ -746,7 +754,7 @@ def route_summary(
             AND total_fare IS NOT NULL
         """
 
-    return conn.execute(
+    result = conn.execute(
         f"""
         SELECT
             UPPER(
@@ -764,3 +772,5 @@ def route_summary(
         """,
         params,
     ).fetchdf()
+    conn.close()
+    return result

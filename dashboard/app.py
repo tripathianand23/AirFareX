@@ -2358,9 +2358,8 @@ with pages[4]:
     st.subheader("Potential Fare Anomalies")
 
     # Monitoring-only anomaly detection.
-    # Uses DuckDB against the Parquet-backed observation store so
-    # the complete observation universe is never materialized
-    # into Pandas on Render.
+    # Route-level IQR bounds are calculated once in DuckDB and reused
+    # for both the anomaly statistics and the review table.
     anomaly_conn = None
 
     try:
@@ -2368,17 +2367,41 @@ with pages[4]:
 
         anomaly_conn = _connection()
 
+        anomaly_conn.execute(
+            """
+            CREATE OR REPLACE TEMP TABLE anomaly_bounds AS
+            SELECT
+                UPPER(
+                    TRIM(origin)
+                    || '_'
+                    || TRIM(destination)
+                ) AS route,
+                quantile_cont(
+                    TRY_CAST(total_fare AS DOUBLE),
+                    0.25
+                ) AS q1,
+                quantile_cont(
+                    TRY_CAST(total_fare AS DOUBLE),
+                    0.75
+                ) AS q3
+            FROM observations
+            WHERE origin IS NOT NULL
+              AND destination IS NOT NULL
+              AND total_fare IS NOT NULL
+              AND TRY_CAST(total_fare AS DOUBLE) IS NOT NULL
+            GROUP BY
+                UPPER(
+                    TRIM(origin)
+                    || '_'
+                    || TRIM(destination)
+                )
+            """
+        )
+
         anomaly_stats = anomaly_conn.execute(
             """
             WITH valid AS (
                 SELECT
-                    collection_timestamp,
-                    origin,
-                    destination,
-                    airline,
-                    advance_days,
-                    base_fare,
-                    taxes,
                     total_fare,
                     UPPER(
                         TRIM(origin)
@@ -2390,66 +2413,30 @@ with pages[4]:
                   AND destination IS NOT NULL
                   AND total_fare IS NOT NULL
                   AND TRY_CAST(total_fare AS DOUBLE) IS NOT NULL
-            ),
-            bounds AS (
-                SELECT
-                    route,
-                    quantile_cont(
-                        TRY_CAST(total_fare AS DOUBLE),
-                        0.25
-                    ) AS q1,
-                    quantile_cont(
-                        TRY_CAST(total_fare AS DOUBLE),
-                        0.75
-                    ) AS q3
-                FROM valid
-                GROUP BY route
-            ),
-            flagged AS (
-                SELECT
-                    v.*,
-                    b.q1,
-                    b.q3,
-                    (
-                        b.q3 - b.q1
-                    ) AS iqr,
-                    (
-                        b.q1 - 1.5 * (b.q3 - b.q1)
-                    ) AS lower_bound,
-                    (
-                        b.q3 + 1.5 * (b.q3 - b.q1)
-                    ) AS upper_bound
-                FROM valid v
-                JOIN bounds b
-                  ON v.route = b.route
             )
             SELECT
                 COUNT(*) AS records_reviewed,
                 SUM(
                     CASE
-                        WHEN TRY_CAST(total_fare AS DOUBLE)
-                             < lower_bound
-                          OR TRY_CAST(total_fare AS DOUBLE)
-                             > upper_bound
+                        WHEN TRY_CAST(v.total_fare AS DOUBLE)
+                             < (b.q1 - 1.5 * (b.q3 - b.q1))
+                          OR TRY_CAST(v.total_fare AS DOUBLE)
+                             > (b.q3 + 1.5 * (b.q3 - b.q1))
                         THEN 1
                         ELSE 0
                     END
                 ) AS anomaly_count
-            FROM flagged
+            FROM valid v
+            INNER JOIN anomaly_bounds b
+                ON v.route = b.route
             """
         ).fetchone()
 
-        records_reviewed = int(
-            anomaly_stats[0] or 0
-        )
-        anomaly_count = int(
-            anomaly_stats[1] or 0
-        )
+        records_reviewed = int(anomaly_stats[0] or 0)
+        anomaly_count = int(anomaly_stats[1] or 0)
 
         anomaly_rate = (
-            anomaly_count
-            / records_reviewed
-            * 100
+            anomaly_count / records_reviewed * 100
             if records_reviewed
             else 0
         )
@@ -2484,58 +2471,40 @@ with pages[4]:
 
             flagged = anomaly_conn.execute(
                 """
-                WITH valid AS (
-                    SELECT
-                        collection_timestamp,
-                        origin,
-                        destination,
-                        airline,
-                        advance_days,
-                        base_fare,
-                        taxes,
-                        total_fare,
-                        UPPER(
-                            TRIM(origin)
-                            || '_'
-                            || TRIM(destination)
-                        ) AS route
-                    FROM observations
-                    WHERE origin IS NOT NULL
-                      AND destination IS NOT NULL
-                      AND total_fare IS NOT NULL
-                      AND TRY_CAST(total_fare AS DOUBLE) IS NOT NULL
-                ),
-                bounds AS (
-                    SELECT
-                        route,
-                        quantile_cont(
-                            TRY_CAST(total_fare AS DOUBLE),
-                            0.25
-                        ) AS q1,
-                        quantile_cont(
-                            TRY_CAST(total_fare AS DOUBLE),
-                            0.75
-                        ) AS q3
-                    FROM valid
-                    GROUP BY route
-                )
                 SELECT
-                    v.*,
+                    o.collection_timestamp,
+                    o.origin,
+                    o.destination,
+                    o.airline,
+                    o.advance_days,
+                    o.base_fare,
+                    o.taxes,
+                    o.total_fare,
+                    UPPER(
+                        TRIM(o.origin)
+                        || '_'
+                        || TRIM(o.destination)
+                    ) AS route,
                     TRUE AS anomaly_flag
-                FROM valid v
-                JOIN bounds b
-                  ON v.route = b.route
-                WHERE TRY_CAST(v.total_fare AS DOUBLE)
-                      < (
-                          b.q1
-                          - 1.5 * (b.q3 - b.q1)
-                      )
-                   OR TRY_CAST(v.total_fare AS DOUBLE)
-                      > (
-                          b.q3
-                          + 1.5 * (b.q3 - b.q1)
-                      )
-                ORDER BY v.collection_timestamp DESC
+                FROM observations o
+                INNER JOIN anomaly_bounds b
+                    ON UPPER(
+                        TRIM(o.origin)
+                        || '_'
+                        || TRIM(o.destination)
+                    ) = b.route
+                WHERE o.origin IS NOT NULL
+                  AND o.destination IS NOT NULL
+                  AND o.total_fare IS NOT NULL
+                  AND TRY_CAST(o.total_fare AS DOUBLE) IS NOT NULL
+                  AND (
+                      TRY_CAST(o.total_fare AS DOUBLE)
+                      < (b.q1 - 1.5 * (b.q3 - b.q1))
+                      OR
+                      TRY_CAST(o.total_fare AS DOUBLE)
+                      > (b.q3 + 1.5 * (b.q3 - b.q1))
+                  )
+                ORDER BY o.collection_timestamp DESC
                 LIMIT 100
                 """
             ).fetchdf()
