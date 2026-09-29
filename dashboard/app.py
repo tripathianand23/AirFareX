@@ -2358,98 +2358,99 @@ with pages[4]:
     st.subheader("Potential Fare Anomalies")
 
     # Monitoring-only anomaly detection.
-    # Uses the canonical validated total_fare field and does not
-    # modify the underlying statistical dataset.
-    anomaly_data = load_clean_data().copy()
+    # Uses DuckDB against the Parquet-backed observation store so
+    # the complete observation universe is never materialized
+    # into Pandas on Render.
+    anomaly_conn = None
 
-    if anomaly_data.empty:
-        st.info(
-            "No anomaly-monitoring data available."
-        )
-    elif not {
-        "origin",
-        "destination",
-        "total_fare",
-    }.issubset(anomaly_data.columns):
-        st.warning(
-            "Anomaly monitoring requires origin, destination and total_fare."
-        )
-    else:
-        anomaly_data["total_fare"] = pd.to_numeric(
-            anomaly_data["total_fare"],
-            errors="coerce",
-        )
+    try:
+        from dashboard.observation_store import _connection
 
-        anomaly_data = anomaly_data.dropna(
-            subset=[
-                "origin",
-                "destination",
-                "total_fare",
-            ]
-        ).copy()
+        anomaly_conn = _connection()
 
-        anomaly_data["route"] = (
-            anomaly_data["origin"].astype(str)
-            + "_"
-            + anomaly_data["destination"].astype(str)
-        )
-
-        q1 = (
-            anomaly_data.groupby("route")["total_fare"]
-            .quantile(0.25)
-            .rename("q1")
-        )
-
-        q3 = (
-            anomaly_data.groupby("route")["total_fare"]
-            .quantile(0.75)
-            .rename("q3")
-        )
-
-        bounds = pd.concat(
-            [q1, q3],
-            axis=1,
-        )
-
-        bounds["iqr"] = (
-            bounds["q3"] - bounds["q1"]
-        )
-
-        bounds["lower_bound"] = (
-            bounds["q1"] - 1.5 * bounds["iqr"]
-        )
-
-        bounds["upper_bound"] = (
-            bounds["q3"] + 1.5 * bounds["iqr"]
-        )
-
-        anomaly_data = anomaly_data.join(
-            bounds[
-                [
-                    "lower_bound",
-                    "upper_bound",
-                ]
-            ],
-            on="route",
-        )
-
-        anomaly_data["anomaly_flag"] = (
-            (anomaly_data["total_fare"] < anomaly_data["lower_bound"])
-            | (
-                anomaly_data["total_fare"]
-                > anomaly_data["upper_bound"]
+        anomaly_stats = anomaly_conn.execute(
+            """
+            WITH valid AS (
+                SELECT
+                    collection_timestamp,
+                    origin,
+                    destination,
+                    airline,
+                    advance_days,
+                    base_fare,
+                    taxes,
+                    total_fare,
+                    UPPER(
+                        TRIM(origin)
+                        || '_'
+                        || TRIM(destination)
+                    ) AS route
+                FROM observations
+                WHERE origin IS NOT NULL
+                  AND destination IS NOT NULL
+                  AND total_fare IS NOT NULL
+                  AND TRY_CAST(total_fare AS DOUBLE) IS NOT NULL
+            ),
+            bounds AS (
+                SELECT
+                    route,
+                    quantile_cont(
+                        TRY_CAST(total_fare AS DOUBLE),
+                        0.25
+                    ) AS q1,
+                    quantile_cont(
+                        TRY_CAST(total_fare AS DOUBLE),
+                        0.75
+                    ) AS q3
+                FROM valid
+                GROUP BY route
+            ),
+            flagged AS (
+                SELECT
+                    v.*,
+                    b.q1,
+                    b.q3,
+                    (
+                        b.q3 - b.q1
+                    ) AS iqr,
+                    (
+                        b.q1 - 1.5 * (b.q3 - b.q1)
+                    ) AS lower_bound,
+                    (
+                        b.q3 + 1.5 * (b.q3 - b.q1)
+                    ) AS upper_bound
+                FROM valid v
+                JOIN bounds b
+                  ON v.route = b.route
             )
-        )
+            SELECT
+                COUNT(*) AS records_reviewed,
+                SUM(
+                    CASE
+                        WHEN TRY_CAST(total_fare AS DOUBLE)
+                             < lower_bound
+                          OR TRY_CAST(total_fare AS DOUBLE)
+                             > upper_bound
+                        THEN 1
+                        ELSE 0
+                    END
+                ) AS anomaly_count
+            FROM flagged
+            """
+        ).fetchone()
 
+        records_reviewed = int(
+            anomaly_stats[0] or 0
+        )
         anomaly_count = int(
-            anomaly_data["anomaly_flag"].sum()
+            anomaly_stats[1] or 0
         )
 
         anomaly_rate = (
             anomaly_count
-            / len(anomaly_data)
+            / records_reviewed
             * 100
-            if len(anomaly_data)
+            if records_reviewed
             else 0
         )
 
@@ -2467,14 +2468,10 @@ with pages[4]:
 
         a3.metric(
             "Records Reviewed",
-            f"{len(anomaly_data):,}",
+            f"{records_reviewed:,}",
         )
 
-        flagged = anomaly_data[
-            anomaly_data["anomaly_flag"]
-        ].copy()
-
-        if flagged.empty:
+        if anomaly_count == 0:
             st.success(
                 "No potential fare anomalies detected."
             )
@@ -2484,6 +2481,64 @@ with pages[4]:
                 "Extreme prices are not automatically deleted because "
                 "they may represent genuine market behaviour."
             )
+
+            flagged = anomaly_conn.execute(
+                """
+                WITH valid AS (
+                    SELECT
+                        collection_timestamp,
+                        origin,
+                        destination,
+                        airline,
+                        advance_days,
+                        base_fare,
+                        taxes,
+                        total_fare,
+                        UPPER(
+                            TRIM(origin)
+                            || '_'
+                            || TRIM(destination)
+                        ) AS route
+                    FROM observations
+                    WHERE origin IS NOT NULL
+                      AND destination IS NOT NULL
+                      AND total_fare IS NOT NULL
+                      AND TRY_CAST(total_fare AS DOUBLE) IS NOT NULL
+                ),
+                bounds AS (
+                    SELECT
+                        route,
+                        quantile_cont(
+                            TRY_CAST(total_fare AS DOUBLE),
+                            0.25
+                        ) AS q1,
+                        quantile_cont(
+                            TRY_CAST(total_fare AS DOUBLE),
+                            0.75
+                        ) AS q3
+                    FROM valid
+                    GROUP BY route
+                )
+                SELECT
+                    v.*,
+                    TRUE AS anomaly_flag
+                FROM valid v
+                JOIN bounds b
+                  ON v.route = b.route
+                WHERE TRY_CAST(v.total_fare AS DOUBLE)
+                      < (
+                          b.q1
+                          - 1.5 * (b.q3 - b.q1)
+                      )
+                   OR TRY_CAST(v.total_fare AS DOUBLE)
+                      > (
+                          b.q3
+                          + 1.5 * (b.q3 - b.q1)
+                      )
+                ORDER BY v.collection_timestamp DESC
+                LIMIT 100
+                """
+            ).fetchdf()
 
             cols = [
                 c
@@ -2521,6 +2576,16 @@ with pages[4]:
                 use_container_width=True,
                 hide_index=True,
             )
+
+    except Exception as exc:
+        st.warning(
+            "Anomaly monitoring is temporarily unavailable. "
+            f"Details: {exc}"
+        )
+
+    finally:
+        if anomaly_conn is not None:
+            anomaly_conn.close()
 
 
 # ============================================================
