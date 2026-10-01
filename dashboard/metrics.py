@@ -7,21 +7,42 @@ import pandas as pd
 
 
 def latest_index(daily_index: pd.DataFrame) -> float:
-    if daily_index.empty:
+    """
+    Return the latest valid index value.
+
+    Collection dates with insufficient coverage may contain NaN.
+    Those dates must not become the dashboard headline index.
+    """
+    if daily_index.empty or "overall_airfare_index" not in daily_index.columns:
         return float("nan")
 
-    return float(
-        daily_index.iloc[-1]["overall_airfare_index"]
-    )
+    values = pd.to_numeric(
+        daily_index["overall_airfare_index"],
+        errors="coerce",
+    ).dropna()
+
+    if values.empty:
+        return float("nan")
+
+    return float(values.iloc[-1])
 
 
 def previous_index(daily_index: pd.DataFrame) -> float:
-    if len(daily_index) < 2:
+    """
+    Return the previous valid index value, skipping NaN collection dates.
+    """
+    if daily_index.empty or "overall_airfare_index" not in daily_index.columns:
         return float("nan")
 
-    return float(
-        daily_index.iloc[-2]["overall_airfare_index"]
-    )
+    values = pd.to_numeric(
+        daily_index["overall_airfare_index"],
+        errors="coerce",
+    ).dropna()
+
+    if len(values) < 2:
+        return float("nan")
+
+    return float(values.iloc[-2])
 
 
 def index_change_percent(
