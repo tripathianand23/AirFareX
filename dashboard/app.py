@@ -720,20 +720,10 @@ def observation_metadata():
         "first_collection": min_timestamp,
         "last_collection": max_timestamp,
     }
-try:
-    _, clean_data = query_observations(
-        page=1,
-        page_size=1_100_000,
-        start_date=None,
-        end_date=None,
-        routes=None,
-        airlines=None,
-        sources=None,
-        columns=None,
-        limit=1_100_000,
-    )
-except Exception:
-    clean_data = pd.DataFrame()
+# Observation data is queried on demand from the cloud-backed
+# observation store. Do not materialize the full observation universe
+# into Pandas during dashboard startup.
+clean_data = pd.DataFrame()
 
 raw_data = pd.DataFrame()
 audit_data, coverage_data, metadata, pipeline_report = load_real_artifacts()
