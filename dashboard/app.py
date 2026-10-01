@@ -1055,18 +1055,6 @@ selected_sources = st.sidebar.multiselect(
     available_sources,
 )
 
-if not valid_dates.empty:
-    min_date = valid_dates.min().date()
-    max_date = valid_dates.max().date()
-
-    selected_dates = st.sidebar.date_input(
-        "Collection date range",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date,
-    )
-else:
-    selected_dates = None
 
 clean_with_route = add_route(clean_data)
 
