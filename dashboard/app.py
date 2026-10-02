@@ -1126,11 +1126,27 @@ min_date = (
     else None
 )
 
-max_date = (
+max_observation_date = (
     pd.Timestamp(valid_max).date()
     if valid_max is not None
     else None
 )
+
+index_dates = pd.to_datetime(
+    daily_index["collection_date"],
+    errors="coerce",
+).dropna()
+
+max_index_date = (
+    index_dates.max().date()
+    if not index_dates.empty
+    else None
+)
+
+if max_observation_date and max_index_date:
+    max_date = max(max_observation_date, max_index_date)
+else:
+    max_date = max_observation_date or max_index_date
 
 if min_date and max_date:
     selected_dates = st.sidebar.date_input(
