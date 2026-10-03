@@ -1495,7 +1495,7 @@ if active_page == "📊 Overview":
         )
 
         c5.metric(
-            "Total Airlines",
+            "Airline Labels",
             f"{observation_meta["airlines"]:,}",
         )
 
