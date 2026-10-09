@@ -41,8 +41,8 @@
   "coverage_policy": "strict_complete_route_x_lead_time",
   "minimum_route_coverage_ratio": 1.0,
   "minimum_stratum_coverage_ratio": 1.0,
-  "input_observations": 1329512,
-  "strata": 19866,
-  "valid_national_index_dates": 32,
+  "input_observations": 1382307,
+  "strata": 20707,
+  "valid_national_index_dates": 33,
   "insufficient_coverage_dates": 2
 }
