@@ -34,3 +34,4 @@ collection_date,observations,routes_present,expected_routes,observed_strata,requ
 2026-10-06,49930,20,20,100,100,True,True,True,True,True,True,True,213.79360100619405,4.853961348418295,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
 2026-10-07,50323,20,20,100,100,True,True,True,True,True,True,True,227.95758432805684,6.625073554681563,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
 2026-10-08,52795,20,20,100,100,True,True,True,True,True,True,True,238.27996601622377,4.528202787634328,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-10-09,49559,20,20,100,100,True,True,True,True,True,True,True,231.97649337837515,-2.6454060503850343,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
