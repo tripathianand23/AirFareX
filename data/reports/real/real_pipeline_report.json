@@ -1,29 +1,29 @@
 {
   "raw_input": "data/raw/airfare_index.json",
-  "normalized_rows": 1885997,
+  "normalized_rows": 1951299,
   "validation": {
     "invalid_fare": 0,
     "missing_required_value": 0,
     "invalid_route": 0,
     "invalid_advance_window": 0,
     "invalid_date_relationship": 0,
-    "duplicate_observation": 153878,
-    "is_valid": 1885997
+    "duplicate_observation": 162075,
+    "is_valid": 1951299
   },
   "deduplication": {
-    "original_rows": 1885997,
-    "duplicate_rows": 90699,
-    "deduplicated_rows": 1795298,
-    "retention_rate_percent": 95.19,
-    "duplicate_groups": 63179
+    "original_rows": 1951299,
+    "duplicate_rows": 95460,
+    "deduplicated_rows": 1855839,
+    "retention_rate_percent": 95.11,
+    "duplicate_groups": 66615
   },
   "cleaning": {
-    "original_rows": 1795298,
-    "clean_rows": 1795298,
+    "original_rows": 1855839,
+    "clean_rows": 1855839,
     "removed_rows": 0,
     "retention_rate_percent": 100.0
   },
-  "final_clean_rows": 1795298,
+  "final_clean_rows": 1855839,
   "output_files": {
     "normalized": "data/processed/real/normalized/normalized_airfare_observations.csv",
     "validated": "data/processed/real/validated/validated_airfare_observations.csv",
