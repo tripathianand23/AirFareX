@@ -43,4 +43,5 @@ collection_date,routes_present,expected_routes,route_coverage_ratio,lead_windows
 2026-10-15,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
 2026-10-16,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
 2026-10-17,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
-2026-10-18,20,20,1.0,5,5,1.0,94,100,0.94,,,False,INSUFFICIENT_COVERAGE
+2026-10-18,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
+2026-10-19,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
