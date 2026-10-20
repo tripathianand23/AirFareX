@@ -29013,6 +29013,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-18,MAA_DEL,45,Ixigo,11938.0,83
 2026-10-18,MAA_DEL,45,MakeMyTrip,10882.0,21
 2026-10-18,MAA_DEL,45,Yatra,11566.0,86
+2026-10-19,AMD_DEL,1,Air India Direct,10038.0,14
 2026-10-19,AMD_DEL,1,Akasa Direct,13530.0,4
 2026-10-19,AMD_DEL,1,Cleartrip,10040.0,39
 2026-10-19,AMD_DEL,1,EaseMyTrip,9462.0,26
@@ -29021,6 +29022,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,AMD_DEL,1,Ixigo,10907.0,52
 2026-10-19,AMD_DEL,1,MakeMyTrip,8990.0,28
 2026-10-19,AMD_DEL,1,Yatra,9643.0,41
+2026-10-19,AMD_DEL,7,Air India Direct,6570.0,15
 2026-10-19,AMD_DEL,7,Akasa Direct,14465.0,4
 2026-10-19,AMD_DEL,7,Cleartrip,9185.5,50
 2026-10-19,AMD_DEL,7,EaseMyTrip,6930.5,30
@@ -29029,6 +29031,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,AMD_DEL,7,Ixigo,10770.0,51
 2026-10-19,AMD_DEL,7,MakeMyTrip,6680.0,26
 2026-10-19,AMD_DEL,7,Yatra,8460.0,48
+2026-10-19,AMD_DEL,15,Air India Direct,10092.0,16
 2026-10-19,AMD_DEL,15,Akasa Direct,17045.5,4
 2026-10-19,AMD_DEL,15,Cleartrip,12476.0,50
 2026-10-19,AMD_DEL,15,EaseMyTrip,10040.0,27
@@ -29037,6 +29040,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,AMD_DEL,15,Ixigo,12794.0,50
 2026-10-19,AMD_DEL,15,MakeMyTrip,9200.0,27
 2026-10-19,AMD_DEL,15,Yatra,11881.0,48
+2026-10-19,AMD_DEL,30,Air India Direct,8133.0,13
 2026-10-19,AMD_DEL,30,Akasa Direct,16088.5,4
 2026-10-19,AMD_DEL,30,Cleartrip,14490.0,53
 2026-10-19,AMD_DEL,30,EaseMyTrip,7576.0,25
@@ -29046,6 +29050,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,AMD_DEL,30,MakeMyTrip,6614.0,19
 2026-10-19,AMD_DEL,30,SpiceJet Direct,7463.0,1
 2026-10-19,AMD_DEL,30,Yatra,14083.0,52
+2026-10-19,AMD_DEL,45,Air India Direct,8405.0,15
 2026-10-19,AMD_DEL,45,Akasa Direct,9911.0,3
 2026-10-19,AMD_DEL,45,Cleartrip,13650.0,63
 2026-10-19,AMD_DEL,45,EaseMyTrip,8254.0,37
@@ -29155,6 +29160,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BLR_DEL,45,MakeMyTrip,10274.0,54
 2026-10-19,BLR_DEL,45,SpiceJet Direct,12804.0,6
 2026-10-19,BLR_DEL,45,Yatra,10216.0,86
+2026-10-19,BLR_HYD,1,Air India Direct,16028.5,18
 2026-10-19,BLR_HYD,1,Akasa Direct,18392.0,4
 2026-10-19,BLR_HYD,1,Cleartrip,14099.0,109
 2026-10-19,BLR_HYD,1,EaseMyTrip,12687.0,75
@@ -29163,6 +29169,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BLR_HYD,1,Ixigo,18392.0,95
 2026-10-19,BLR_HYD,1,MakeMyTrip,8330.5,54
 2026-10-19,BLR_HYD,1,Yatra,12039.0,93
+2026-10-19,BLR_HYD,7,Air India Direct,14035.0,18
 2026-10-19,BLR_HYD,7,Akasa Direct,21561.5,4
 2026-10-19,BLR_HYD,7,Cleartrip,8885.0,96
 2026-10-19,BLR_HYD,7,EaseMyTrip,9069.0,76
@@ -29171,6 +29178,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BLR_HYD,7,Ixigo,13405.0,103
 2026-10-19,BLR_HYD,7,MakeMyTrip,6017.0,29
 2026-10-19,BLR_HYD,7,Yatra,10058.0,96
+2026-10-19,BLR_HYD,15,Air India Direct,12928.0,17
 2026-10-19,BLR_HYD,15,Akasa Direct,23036.5,4
 2026-10-19,BLR_HYD,15,Cleartrip,9252.0,82
 2026-10-19,BLR_HYD,15,EaseMyTrip,9814.0,73
@@ -29179,6 +29187,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BLR_HYD,15,Ixigo,10637.0,79
 2026-10-19,BLR_HYD,15,MakeMyTrip,7182.0,31
 2026-10-19,BLR_HYD,15,Yatra,9969.0,83
+2026-10-19,BLR_HYD,30,Air India Direct,13664.5,18
 2026-10-19,BLR_HYD,30,Akasa Direct,20393.0,4
 2026-10-19,BLR_HYD,30,Cleartrip,9076.0,87
 2026-10-19,BLR_HYD,30,EaseMyTrip,7551.5,70
@@ -29187,6 +29196,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BLR_HYD,30,Ixigo,13822.0,95
 2026-10-19,BLR_HYD,30,MakeMyTrip,5244.0,27
 2026-10-19,BLR_HYD,30,Yatra,12724.0,89
+2026-10-19,BLR_HYD,45,Air India Direct,14948.5,18
 2026-10-19,BLR_HYD,45,Akasa Direct,21884.0,1
 2026-10-19,BLR_HYD,45,Cleartrip,9061.5,82
 2026-10-19,BLR_HYD,45,EaseMyTrip,7921.0,71
@@ -29295,6 +29305,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_DEL,45,MakeMyTrip,7234.0,75
 2026-10-19,BOM_DEL,45,SpiceJet Direct,6868.0,6
 2026-10-19,BOM_DEL,45,Yatra,7330.5,90
+2026-10-19,BOM_GOI,1,Air India Direct,10173.0,16
 2026-10-19,BOM_GOI,1,Cleartrip,10685.0,47
 2026-10-19,BOM_GOI,1,EaseMyTrip,5972.0,35
 2026-10-19,BOM_GOI,1,Goibibo,4657.0,25
@@ -29302,6 +29313,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_GOI,1,Ixigo,12977.0,48
 2026-10-19,BOM_GOI,1,MakeMyTrip,4174.0,20
 2026-10-19,BOM_GOI,1,Yatra,8453.0,39
+2026-10-19,BOM_GOI,7,Air India Direct,11536.5,16
 2026-10-19,BOM_GOI,7,Cleartrip,12120.5,50
 2026-10-19,BOM_GOI,7,EaseMyTrip,5972.0,41
 2026-10-19,BOM_GOI,7,Goibibo,3965.0,27
@@ -29309,6 +29321,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_GOI,7,Ixigo,14742.0,60
 2026-10-19,BOM_GOI,7,MakeMyTrip,3804.0,20
 2026-10-19,BOM_GOI,7,Yatra,12272.0,51
+2026-10-19,BOM_GOI,15,Air India Direct,5667.0,16
 2026-10-19,BOM_GOI,15,Cleartrip,5972.0,40
 2026-10-19,BOM_GOI,15,EaseMyTrip,5972.0,48
 2026-10-19,BOM_GOI,15,Goibibo,3804.0,26
@@ -29316,6 +29329,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_GOI,15,Ixigo,11265.0,59
 2026-10-19,BOM_GOI,15,MakeMyTrip,3804.0,20
 2026-10-19,BOM_GOI,15,Yatra,9939.0,49
+2026-10-19,BOM_GOI,30,Air India Direct,6357.0,16
 2026-10-19,BOM_GOI,30,Cleartrip,18094.0,69
 2026-10-19,BOM_GOI,30,EaseMyTrip,6749.5,46
 2026-10-19,BOM_GOI,30,Goibibo,5064.0,31
@@ -29324,6 +29338,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_GOI,30,MakeMyTrip,3854.0,24
 2026-10-19,BOM_GOI,30,SpiceJet Direct,3778.5,2
 2026-10-19,BOM_GOI,30,Yatra,15577.0,53
+2026-10-19,BOM_GOI,45,Air India Direct,15136.5,16
 2026-10-19,BOM_GOI,45,Cleartrip,18044.0,77
 2026-10-19,BOM_GOI,45,EaseMyTrip,9701.0,43
 2026-10-19,BOM_GOI,45,Goibibo,8053.0,32
@@ -29332,6 +29347,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_GOI,45,MakeMyTrip,6370.0,24
 2026-10-19,BOM_GOI,45,SpiceJet Direct,5556.5,2
 2026-10-19,BOM_GOI,45,Yatra,14008.5,56
+2026-10-19,BOM_MAA,1,Air India Direct,23715.5,14
 2026-10-19,BOM_MAA,1,Akasa Direct,6632.0,1
 2026-10-19,BOM_MAA,1,Cleartrip,8699.5,66
 2026-10-19,BOM_MAA,1,EaseMyTrip,8465.0,50
@@ -29340,6 +29356,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_MAA,1,Ixigo,10512.0,77
 2026-10-19,BOM_MAA,1,MakeMyTrip,7288.0,21
 2026-10-19,BOM_MAA,1,Yatra,9019.0,76
+2026-10-19,BOM_MAA,7,Air India Direct,16542.0,15
 2026-10-19,BOM_MAA,7,Akasa Direct,8278.0,1
 2026-10-19,BOM_MAA,7,Cleartrip,11472.0,95
 2026-10-19,BOM_MAA,7,EaseMyTrip,9099.0,55
@@ -29348,6 +29365,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_MAA,7,Ixigo,11924.0,78
 2026-10-19,BOM_MAA,7,MakeMyTrip,8253.5,24
 2026-10-19,BOM_MAA,7,Yatra,9830.0,63
+2026-10-19,BOM_MAA,15,Air India Direct,16747.0,15
 2026-10-19,BOM_MAA,15,Akasa Direct,6632.0,1
 2026-10-19,BOM_MAA,15,Cleartrip,8465.0,69
 2026-10-19,BOM_MAA,15,EaseMyTrip,8229.0,54
@@ -29356,6 +29374,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_MAA,15,Ixigo,10561.5,80
 2026-10-19,BOM_MAA,15,MakeMyTrip,6966.0,22
 2026-10-19,BOM_MAA,15,Yatra,8138.0,71
+2026-10-19,BOM_MAA,30,Air India Direct,16747.0,14
 2026-10-19,BOM_MAA,30,Akasa Direct,6954.0,1
 2026-10-19,BOM_MAA,30,Cleartrip,9295.5,62
 2026-10-19,BOM_MAA,30,EaseMyTrip,8863.0,51
@@ -29364,6 +29383,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,BOM_MAA,30,Ixigo,11337.0,66
 2026-10-19,BOM_MAA,30,MakeMyTrip,7379.0,25
 2026-10-19,BOM_MAA,30,Yatra,9104.0,59
+2026-10-19,BOM_MAA,45,Air India Direct,16747.0,15
 2026-10-19,BOM_MAA,45,Cleartrip,9558.0,62
 2026-10-19,BOM_MAA,45,EaseMyTrip,9178.0,55
 2026-10-19,BOM_MAA,45,Goibibo,6966.0,22
@@ -29391,6 +29411,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,CCU_DEL,7,MakeMyTrip,11675.0,43
 2026-10-19,CCU_DEL,7,SpiceJet Direct,11623.0,1
 2026-10-19,CCU_DEL,7,Yatra,14763.0,75
+2026-10-19,CCU_DEL,15,Air India Direct,9464.0,12
 2026-10-19,CCU_DEL,15,Akasa Direct,8331.0,3
 2026-10-19,CCU_DEL,15,Cleartrip,11211.0,89
 2026-10-19,CCU_DEL,15,EaseMyTrip,11106.0,75
@@ -29420,6 +29441,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,CCU_DEL,45,MakeMyTrip,9164.0,40
 2026-10-19,CCU_DEL,45,SpiceJet Direct,9248.0,1
 2026-10-19,CCU_DEL,45,Yatra,10616.0,75
+2026-10-19,DEL_AMD,1,Air India Direct,10324.0,19
 2026-10-19,DEL_AMD,1,Akasa Direct,12516.5,6
 2026-10-19,DEL_AMD,1,Cleartrip,10692.0,53
 2026-10-19,DEL_AMD,1,EaseMyTrip,6261.0,30
@@ -29428,6 +29450,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_AMD,1,Ixigo,11297.5,54
 2026-10-19,DEL_AMD,1,MakeMyTrip,6031.0,22
 2026-10-19,DEL_AMD,1,Yatra,10202.0,57
+2026-10-19,DEL_AMD,7,Air India Direct,11980.0,19
 2026-10-19,DEL_AMD,7,Akasa Direct,12241.0,7
 2026-10-19,DEL_AMD,7,Cleartrip,12924.0,72
 2026-10-19,DEL_AMD,7,EaseMyTrip,6636.0,28
@@ -29436,6 +29459,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_AMD,7,Ixigo,13151.0,73
 2026-10-19,DEL_AMD,7,MakeMyTrip,6216.0,23
 2026-10-19,DEL_AMD,7,Yatra,12279.0,68
+2026-10-19,DEL_AMD,15,Air India Direct,12686.0,20
 2026-10-19,DEL_AMD,15,Akasa Direct,17302.0,7
 2026-10-19,DEL_AMD,15,Cleartrip,14920.0,63
 2026-10-19,DEL_AMD,15,EaseMyTrip,6314.0,31
@@ -29444,6 +29468,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_AMD,15,Ixigo,15239.0,64
 2026-10-19,DEL_AMD,15,MakeMyTrip,6000.0,22
 2026-10-19,DEL_AMD,15,Yatra,13927.0,63
+2026-10-19,DEL_AMD,30,Air India Direct,20075.0,19
 2026-10-19,DEL_AMD,30,Akasa Direct,20474.0,7
 2026-10-19,DEL_AMD,30,Cleartrip,20859.5,78
 2026-10-19,DEL_AMD,30,EaseMyTrip,20023.0,35
@@ -29452,6 +29477,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_AMD,30,Ixigo,20859.5,76
 2026-10-19,DEL_AMD,30,MakeMyTrip,20023.0,21
 2026-10-19,DEL_AMD,30,Yatra,19847.0,74
+2026-10-19,DEL_AMD,45,Air India Direct,12923.0,19
 2026-10-19,DEL_AMD,45,Akasa Direct,14988.0,7
 2026-10-19,DEL_AMD,45,Cleartrip,13045.0,65
 2026-10-19,DEL_AMD,45,EaseMyTrip,7476.0,35
@@ -29581,6 +29607,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_CCU,7,MakeMyTrip,14592.0,42
 2026-10-19,DEL_CCU,7,SpiceJet Direct,13125.0,1
 2026-10-19,DEL_CCU,7,Yatra,18478.5,98
+2026-10-19,DEL_CCU,15,Air India Direct,11582.0,15
 2026-10-19,DEL_CCU,15,Akasa Direct,9308.0,3
 2026-10-19,DEL_CCU,15,Cleartrip,12862.0,99
 2026-10-19,DEL_CCU,15,EaseMyTrip,12039.0,77
@@ -29610,6 +29637,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_CCU,45,MakeMyTrip,9301.5,36
 2026-10-19,DEL_CCU,45,SpiceJet Direct,9366.0,1
 2026-10-19,DEL_CCU,45,Yatra,11039.0,91
+2026-10-19,DEL_GOI,1,Air India Direct,10244.0,14
 2026-10-19,DEL_GOI,1,Cleartrip,10593.0,84
 2026-10-19,DEL_GOI,1,EaseMyTrip,9773.0,61
 2026-10-19,DEL_GOI,1,Goibibo,9422.0,56
@@ -29617,6 +29645,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_GOI,1,Ixigo,10593.0,71
 2026-10-19,DEL_GOI,1,MakeMyTrip,8473.5,16
 2026-10-19,DEL_GOI,1,Yatra,9712.0,50
+2026-10-19,DEL_GOI,7,Air India Direct,16291.5,14
 2026-10-19,DEL_GOI,7,Cleartrip,10903.0,90
 2026-10-19,DEL_GOI,7,EaseMyTrip,9665.0,63
 2026-10-19,DEL_GOI,7,Goibibo,7689.0,27
@@ -29624,6 +29653,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_GOI,7,Ixigo,11688.5,82
 2026-10-19,DEL_GOI,7,MakeMyTrip,7846.5,16
 2026-10-19,DEL_GOI,7,Yatra,9300.0,52
+2026-10-19,DEL_GOI,15,Air India Direct,10322.0,16
 2026-10-19,DEL_GOI,15,Cleartrip,10847.0,103
 2026-10-19,DEL_GOI,15,EaseMyTrip,9803.0,92
 2026-10-19,DEL_GOI,15,Goibibo,7973.5,24
@@ -29631,6 +29661,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_GOI,15,Ixigo,10847.0,82
 2026-10-19,DEL_GOI,15,MakeMyTrip,7873.0,14
 2026-10-19,DEL_GOI,15,Yatra,8974.0,52
+2026-10-19,DEL_GOI,30,Air India Direct,13609.5,16
 2026-10-19,DEL_GOI,30,Cleartrip,13271.0,115
 2026-10-19,DEL_GOI,30,EaseMyTrip,11978.0,70
 2026-10-19,DEL_GOI,30,Goibibo,11413.5,88
@@ -29639,6 +29670,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_GOI,30,MakeMyTrip,11563.0,21
 2026-10-19,DEL_GOI,30,SpiceJet Direct,10314.0,6
 2026-10-19,DEL_GOI,30,Yatra,11390.0,74
+2026-10-19,DEL_GOI,45,Air India Direct,17577.0,16
 2026-10-19,DEL_GOI,45,Cleartrip,17073.0,111
 2026-10-19,DEL_GOI,45,EaseMyTrip,12340.0,71
 2026-10-19,DEL_GOI,45,Goibibo,11736.0,61
@@ -29692,6 +29724,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_HYD,45,Ixigo,15323.0,105
 2026-10-19,DEL_HYD,45,MakeMyTrip,10768.0,32
 2026-10-19,DEL_HYD,45,Yatra,11377.0,88
+2026-10-19,DEL_MAA,1,Air India Direct,18120.0,15
 2026-10-19,DEL_MAA,1,Akasa Direct,13489.0,1
 2026-10-19,DEL_MAA,1,Cleartrip,14550.0,127
 2026-10-19,DEL_MAA,1,EaseMyTrip,12989.0,91
@@ -29700,6 +29733,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_MAA,1,Ixigo,15063.0,119
 2026-10-19,DEL_MAA,1,MakeMyTrip,11636.0,27
 2026-10-19,DEL_MAA,1,Yatra,13654.0,96
+2026-10-19,DEL_MAA,7,Air India Direct,13278.0,15
 2026-10-19,DEL_MAA,7,Akasa Direct,9685.0,2
 2026-10-19,DEL_MAA,7,Cleartrip,15057.0,117
 2026-10-19,DEL_MAA,7,EaseMyTrip,14384.0,91
@@ -29708,6 +29742,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_MAA,7,Ixigo,16084.0,96
 2026-10-19,DEL_MAA,7,MakeMyTrip,12815.0,30
 2026-10-19,DEL_MAA,7,Yatra,13675.0,81
+2026-10-19,DEL_MAA,15,Air India Direct,13488.0,15
 2026-10-19,DEL_MAA,15,Akasa Direct,10897.0,2
 2026-10-19,DEL_MAA,15,Cleartrip,12724.0,123
 2026-10-19,DEL_MAA,15,EaseMyTrip,12409.0,79
@@ -29716,6 +29751,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_MAA,15,Ixigo,14190.0,103
 2026-10-19,DEL_MAA,15,MakeMyTrip,10484.0,19
 2026-10-19,DEL_MAA,15,Yatra,11946.0,79
+2026-10-19,DEL_MAA,30,Air India Direct,10882.0,15
 2026-10-19,DEL_MAA,30,Akasa Direct,11572.0,2
 2026-10-19,DEL_MAA,30,Cleartrip,16096.5,118
 2026-10-19,DEL_MAA,30,EaseMyTrip,15029.0,95
@@ -29724,6 +29760,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_MAA,30,Ixigo,17086.0,96
 2026-10-19,DEL_MAA,30,MakeMyTrip,10832.0,23
 2026-10-19,DEL_MAA,30,Yatra,12234.0,69
+2026-10-19,DEL_MAA,45,Air India Direct,15410.0,15
 2026-10-19,DEL_MAA,45,Akasa Direct,9685.0,1
 2026-10-19,DEL_MAA,45,Cleartrip,13702.0,118
 2026-10-19,DEL_MAA,45,EaseMyTrip,12436.0,77
@@ -29732,6 +29769,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,DEL_MAA,45,Ixigo,15080.0,96
 2026-10-19,DEL_MAA,45,MakeMyTrip,10484.0,22
 2026-10-19,DEL_MAA,45,Yatra,11946.0,71
+2026-10-19,HYD_BLR,1,Air India Direct,6585.0,12
 2026-10-19,HYD_BLR,1,Akasa Direct,17698.0,1
 2026-10-19,HYD_BLR,1,Cleartrip,8612.0,84
 2026-10-19,HYD_BLR,1,EaseMyTrip,8061.0,60
@@ -29740,6 +29778,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,HYD_BLR,1,Ixigo,11952.0,95
 2026-10-19,HYD_BLR,1,MakeMyTrip,6728.5,26
 2026-10-19,HYD_BLR,1,Yatra,11749.5,96
+2026-10-19,HYD_BLR,7,Air India Direct,12429.5,14
 2026-10-19,HYD_BLR,7,Akasa Direct,21691.0,1
 2026-10-19,HYD_BLR,7,Cleartrip,10598.0,89
 2026-10-19,HYD_BLR,7,EaseMyTrip,9876.0,62
@@ -29748,6 +29787,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,HYD_BLR,7,Ixigo,16106.0,75
 2026-10-19,HYD_BLR,7,MakeMyTrip,9899.0,28
 2026-10-19,HYD_BLR,7,Yatra,11765.0,93
+2026-10-19,HYD_BLR,15,Air India Direct,6343.0,14
 2026-10-19,HYD_BLR,15,Akasa Direct,19126.0,1
 2026-10-19,HYD_BLR,15,Cleartrip,5833.5,72
 2026-10-19,HYD_BLR,15,EaseMyTrip,5620.0,59
@@ -29756,6 +29796,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,HYD_BLR,15,Ixigo,8612.0,83
 2026-10-19,HYD_BLR,15,MakeMyTrip,4998.0,22
 2026-10-19,HYD_BLR,15,Yatra,5467.0,71
+2026-10-19,HYD_BLR,30,Air India Direct,12378.0,14
 2026-10-19,HYD_BLR,30,Akasa Direct,22282.5,2
 2026-10-19,HYD_BLR,30,Cleartrip,9802.0,79
 2026-10-19,HYD_BLR,30,EaseMyTrip,9047.0,60
@@ -29764,6 +29805,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,HYD_BLR,30,Ixigo,14941.0,91
 2026-10-19,HYD_BLR,30,MakeMyTrip,7558.0,32
 2026-10-19,HYD_BLR,30,Yatra,13662.0,81
+2026-10-19,HYD_BLR,45,Air India Direct,7369.0,14
 2026-10-19,HYD_BLR,45,Akasa Direct,17221.0,1
 2026-10-19,HYD_BLR,45,Cleartrip,6292.0,76
 2026-10-19,HYD_BLR,45,EaseMyTrip,6174.0,58
@@ -29772,6 +29814,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,HYD_BLR,45,Ixigo,16121.0,75
 2026-10-19,HYD_BLR,45,MakeMyTrip,5384.0,25
 2026-10-19,HYD_BLR,45,Yatra,10108.0,89
+2026-10-19,HYD_DEL,1,Air India Direct,8709.0,14
 2026-10-19,HYD_DEL,1,Akasa Direct,8609.0,2
 2026-10-19,HYD_DEL,1,Cleartrip,10237.0,100
 2026-10-19,HYD_DEL,1,EaseMyTrip,10001.0,77
@@ -29816,6 +29859,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,HYD_DEL,45,Ixigo,13449.0,80
 2026-10-19,HYD_DEL,45,MakeMyTrip,10231.0,38
 2026-10-19,HYD_DEL,45,Yatra,10175.0,94
+2026-10-19,MAA_BOM,1,Air India Direct,8615.0,11
 2026-10-19,MAA_BOM,1,Akasa Direct,7769.0,1
 2026-10-19,MAA_BOM,1,Cleartrip,10243.0,93
 2026-10-19,MAA_BOM,1,EaseMyTrip,8685.0,51
@@ -29824,6 +29868,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_BOM,1,Ixigo,9525.0,71
 2026-10-19,MAA_BOM,1,MakeMyTrip,7855.0,22
 2026-10-19,MAA_BOM,1,Yatra,9083.0,79
+2026-10-19,MAA_BOM,7,Air India Direct,11977.0,13
 2026-10-19,MAA_BOM,7,Akasa Direct,7320.0,1
 2026-10-19,MAA_BOM,7,Cleartrip,9715.0,73
 2026-10-19,MAA_BOM,7,EaseMyTrip,9511.0,50
@@ -29832,6 +29877,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_BOM,7,Ixigo,10849.0,80
 2026-10-19,MAA_BOM,7,MakeMyTrip,8169.0,24
 2026-10-19,MAA_BOM,7,Yatra,9610.0,69
+2026-10-19,MAA_BOM,15,Air India Direct,17113.0,13
 2026-10-19,MAA_BOM,15,Akasa Direct,7769.0,1
 2026-10-19,MAA_BOM,15,Cleartrip,9550.5,68
 2026-10-19,MAA_BOM,15,EaseMyTrip,9161.5,50
@@ -29840,6 +29886,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_BOM,15,Ixigo,11084.0,67
 2026-10-19,MAA_BOM,15,MakeMyTrip,7855.0,23
 2026-10-19,MAA_BOM,15,Yatra,9682.0,71
+2026-10-19,MAA_BOM,30,Air India Direct,19245.0,11
 2026-10-19,MAA_BOM,30,Akasa Direct,11538.0,1
 2026-10-19,MAA_BOM,30,Cleartrip,11436.0,74
 2026-10-19,MAA_BOM,30,EaseMyTrip,10851.0,49
@@ -29848,6 +29895,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_BOM,30,Ixigo,12266.0,83
 2026-10-19,MAA_BOM,30,MakeMyTrip,9495.0,26
 2026-10-19,MAA_BOM,30,Yatra,11405.0,85
+2026-10-19,MAA_BOM,45,Air India Direct,16251.0,13
 2026-10-19,MAA_BOM,45,Akasa Direct,6998.0,1
 2026-10-19,MAA_BOM,45,Cleartrip,10034.0,75
 2026-10-19,MAA_BOM,45,EaseMyTrip,9511.0,47
@@ -29856,6 +29904,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_BOM,45,Ixigo,9275.0,26
 2026-10-19,MAA_BOM,45,MakeMyTrip,7855.0,23
 2026-10-19,MAA_BOM,45,Yatra,11642.0,77
+2026-10-19,MAA_DEL,1,Air India Direct,14069.0,11
 2026-10-19,MAA_DEL,1,Akasa Direct,12325.0,1
 2026-10-19,MAA_DEL,1,Cleartrip,12328.5,100
 2026-10-19,MAA_DEL,1,EaseMyTrip,11938.0,67
@@ -29864,6 +29913,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_DEL,1,Ixigo,14235.0,95
 2026-10-19,MAA_DEL,1,MakeMyTrip,10707.0,22
 2026-10-19,MAA_DEL,1,Yatra,11448.0,71
+2026-10-19,MAA_DEL,7,Air India Direct,13130.5,12
 2026-10-19,MAA_DEL,7,Akasa Direct,10975.0,1
 2026-10-19,MAA_DEL,7,Cleartrip,14136.5,106
 2026-10-19,MAA_DEL,7,EaseMyTrip,12538.0,71
@@ -29872,6 +29922,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_DEL,7,Ixigo,14537.0,82
 2026-10-19,MAA_DEL,7,MakeMyTrip,12306.0,29
 2026-10-19,MAA_DEL,7,Yatra,12493.5,84
+2026-10-19,MAA_DEL,15,Air India Direct,12041.0,12
 2026-10-19,MAA_DEL,15,Akasa Direct,12325.0,1
 2026-10-19,MAA_DEL,15,Cleartrip,12737.0,94
 2026-10-19,MAA_DEL,15,EaseMyTrip,12356.0,71
@@ -29880,6 +29931,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_DEL,15,Ixigo,13070.0,82
 2026-10-19,MAA_DEL,15,MakeMyTrip,11473.0,26
 2026-10-19,MAA_DEL,15,Yatra,11710.5,64
+2026-10-19,MAA_DEL,30,Air India Direct,11033.0,12
 2026-10-19,MAA_DEL,30,Akasa Direct,18064.0,1
 2026-10-19,MAA_DEL,30,Cleartrip,12227.0,100
 2026-10-19,MAA_DEL,30,EaseMyTrip,11938.0,67
@@ -29888,6 +29940,7 @@ collection_date,route,advance_days,source,representative_fare,observation_count
 2026-10-19,MAA_DEL,30,Ixigo,12279.5,78
 2026-10-19,MAA_DEL,30,MakeMyTrip,10983.0,24
 2026-10-19,MAA_DEL,30,Yatra,11448.0,72
+2026-10-19,MAA_DEL,45,Air India Direct,11033.0,13
 2026-10-19,MAA_DEL,45,Akasa Direct,10083.0,1
 2026-10-19,MAA_DEL,45,Cleartrip,12227.0,110
 2026-10-19,MAA_DEL,45,EaseMyTrip,11912.0,66
