@@ -1,1 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AirFareX</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand">✈️ <span>Airfare Index</span></div>
+    <hr>
+    <div class="filter-heading">Exploratory filters</div>
+    <label for="date-start">Collection date range</label>
+    <div class="date-range"><input id="date-start" type="date"><input id="date-end" type="date"></div>
+    <label for="routes">Routes</label><select id="routes" multiple size="4" aria-label="Routes"></select>
+    <label for="airlines">Airlines</label><select id="airlines" multiple size="4" aria-label="Airlines"></select>
+    <label for="sources">Sources</label><select id="sources" multiple size="4" aria-label="Sources"></select>
+    <hr><p class="muted">Filters below affect exploratory views only. They never recalculate the headline index.</p>
+    <button id="refresh">🔄 Refresh statistical datasets</button>
+    <p id="connection" class="connection">Connecting to data service…</p>
+  </aside>
+  <main class="main">
+    <header class="top-shell"><div class="hero"><div class="eyebrow">AIRFAREX · STATISTICAL OPERATIONS</div><h1>AirFareX</h1><p>Real-Time Airfare Price Intelligence Platform for India</p><div class="hero-badges"><span class="badge">✈️ Airfare Price Index</span><span class="badge">Published statistical artifacts</span><span class="badge real-badge">REAL DATA</span></div></div></header>
+    <nav id="navigation" class="navigation" aria-label="Dashboard sections"></nav>
+    <div id="page-content"><section class="panel"><h2>Connecting to the existing statistical data</h2><p class="muted">The interface does not generate replacement or sample statistics. It reads the existing project’s published artifacts and data services.</p></section></div>
+    <footer>AirFareX · UI migration · Headline index remains driven by published statistical artifacts.</footer>
+  </main>
+  <script src="app.js"></script>
+</body></html>
 
