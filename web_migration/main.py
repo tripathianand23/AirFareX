@@ -9,11 +9,12 @@ from __future__ import annotations
 import json
 import os
 import sys
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -258,3 +259,221 @@ def refresh():
     """Clear only in-process read caches; does not alter raw or historical data."""
     _published_data.cache_clear()
     return {"ok": True, "message": "Published artifact cache cleared. Pipeline data was not modified."}
+
+
+@app.get("/api/metadata")
+def metadata_compat():
+    try:
+        daily, routes, lead = _published_data()
+        dates = []
+
+        for frame in (daily, routes, lead):
+            if "collection_date" in frame.columns:
+                dates.extend(
+                    frame["collection_date"].dropna().astype(str).tolist()
+                )
+
+        return {
+            "dimensions": _observation_dimensions(),
+            "min_date": min(dates) if dates else None,
+            "max_date": max(dates) if dates else None,
+            "metadata": _metadata(),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@app.post("/api/dashboard")
+def dashboard_compat(request: dict = Body(default={})):
+    try:
+        daily, routes, lead = _published_data()
+        filters = request.get("filters") or {}
+        page = request.get("page", "overview")
+
+        def filter_dates(frame):
+            result = frame.copy()
+
+            if "collection_date" in result.columns:
+                dates = result["collection_date"].astype(str)
+
+                if filters.get("start_date"):
+                    result = result[
+                        dates >= str(filters["start_date"])
+                    ]
+                    dates = result["collection_date"].astype(str)
+
+                if filters.get("end_date"):
+                    result = result[
+                        dates <= str(filters["end_date"])
+                    ]
+
+            return result
+
+        d = filter_dates(daily)
+        r = filter_dates(routes)
+        l = filter_dates(lead)
+
+        daily_rows = _records(d, 5000)
+        route_rows = _records(r, 5000)
+        lead_rows = _records(l, 5000)
+        audit_rows = _audit()
+
+        latest = daily_rows[-1] if daily_rows else {}
+        previous = daily_rows[-2] if len(daily_rows) > 1 else {}
+
+        latest_index = latest.get("overall_airfare_index")
+        previous_index = previous.get("overall_airfare_index")
+        daily_change = None
+
+        try:
+            if latest_index is not None and previous_index not in (None, 0):
+                daily_change = (
+                    float(latest_index) / float(previous_index) - 1
+                ) * 100
+        except (ValueError, TypeError, ZeroDivisionError):
+            pass
+
+        def make_chart(rows, x_key, y_key, title):
+            valid = [
+                row for row in rows
+                if row.get(x_key) is not None
+                and row.get(y_key) is not None
+            ]
+
+            if not valid:
+                return {
+                    "data": [],
+                    "layout": {"title": title}
+                }
+
+            return {
+                "data": [{
+                    "type": "scatter",
+                    "mode": "lines+markers",
+                    "name": title,
+                    "x": [row[x_key] for row in valid],
+                    "y": [row[y_key] for row in valid],
+                }],
+                "layout": {
+                    "title": title,
+                    "autosize": True,
+                    "margin": {"t": 40, "r": 20, "b": 50, "l": 55},
+                    "paper_bgcolor": "#ffffff",
+                    "plot_bgcolor": "#ffffff",
+                    "xaxis": {"title": x_key},
+                    "yaxis": {"title": y_key},
+                },
+            }
+
+        charts = {
+            "chart-overall": make_chart(
+                daily_rows, "collection_date",
+                "overall_airfare_index", "Overall Airfare Index"
+            ),
+            "chart-daily": make_chart(
+                daily_rows, "collection_date",
+                "overall_airfare_index", "Daily Airfare Index"
+            ),
+            "chart-routes": make_chart(
+                route_rows, "collection_date",
+                "route_index", "Route-wise Airfare Index"
+            ),
+            "chart-route-movement": make_chart(
+                route_rows, "collection_date",
+                "route_index", "Route Index Movement"
+            ),
+            "chart-lead": make_chart(
+                lead_rows, "collection_date",
+                "airfare_index", "Lead-Time Price Index"
+            ),
+            "chart-lead-time": make_chart(
+                lead_rows, "collection_date",
+                "airfare_index", "Lead-Time Price Index"
+            ),
+        }
+
+        source_rows = []
+        quality_rows = []
+        observation_rows = []
+
+        try:
+            from dashboard.observation_store import (
+                source_summary,
+                data_quality_summary,
+                query_observations,
+            )
+
+            source_rows = _records(source_summary())
+
+            quality = data_quality_summary()
+            if hasattr(quality, "to_dict"):
+                quality_rows = _records(quality)
+            elif isinstance(quality, dict):
+                quality_rows = [quality]
+
+            result = query_observations(
+                page=1,
+                page_size=100,
+                start_date=filters.get("start_date"),
+                end_date=filters.get("end_date"),
+                routes=filters.get("routes") or None,
+                airlines=filters.get("airlines") or None,
+                sources=filters.get("sources") or None,
+            )
+
+            _, observation_frame = result
+            observation_rows = _records(observation_frame)
+
+        except Exception:
+            # Missing optional diagnostics must not fabricate data.
+            pass
+
+        metadata = _metadata()
+        publish_status = next(
+            (
+                row.get("publication_status")
+                for row in reversed(audit_rows)
+                if str(row.get("publication_status", "")).upper()
+                == "PUBLISHABLE"
+            ),
+            "Unavailable",
+        )
+
+        coverage_path = INDEX_DIR / "real_coverage_report.csv"
+
+        return {
+            "metrics": {
+                "latest_index": latest_index,
+                "previous_index": previous_index,
+                "daily_change_pct": daily_change,
+                "change_7d": None,
+                "change_30d": None,
+                "quality_score": None,
+                "publication_status": publish_status,
+            },
+            "charts": charts,
+            "tables": {
+                "audit_trail": audit_rows[-250:],
+                "route_ranking": route_rows[-250:],
+                "route_explorer": route_rows[-250:],
+                "lead_time_explorer": lead_rows[-250:],
+                "data_quality": quality_rows,
+                "anomalies": [],
+                "source_summary": source_rows,
+                "raw_observations": observation_rows,
+                "latest_audit": audit_rows[-10:],
+                "coverage_gate": _records(_read_csv(coverage_path)),
+                "pipeline_stages": [],
+                "provenance": [metadata] if metadata else [],
+                "resilience_policy": [],
+            },
+            "audit_gates": [],
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Dashboard data unavailable: {exc}",
+        )
+
+
