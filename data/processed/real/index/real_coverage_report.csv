@@ -49,3 +49,4 @@ collection_date,routes_present,expected_routes,route_coverage_ratio,lead_windows
 2026-10-21,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
 2026-10-22,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
 2026-10-23,20,20,1.0,5,5,1.0,100,100,1.0,,,True,PASS
+2026-10-24,12,20,0.6,5,5,1.0,57,100,0.57,"AMD_DEL,BLR_HYD,BOM_MAA,DEL_AMD,DEL_MAA,HYD_BLR,MAA_BOM,MAA_DEL",,False,INSUFFICIENT_COVERAGE

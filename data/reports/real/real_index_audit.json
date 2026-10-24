@@ -1077,6 +1077,33 @@
       "warnings": [
         "validated_duplicate_flags_present_before_deduplication"
       ]
+    },
+    {
+      "collection_date": "2026-10-24",
+      "observations": 7469,
+      "routes_present": 12,
+      "expected_routes": 20,
+      "observed_strata": 57,
+      "required_strata": 100,
+      "coverage_complete": false,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": false,
+      "contribution_reconciliation_pass": false,
+      "base_period_pass": false,
+      "national_index": NaN,
+      "movement_from_base_pct": NaN,
+      "publication_status": "HOLD",
+      "failed_checks": [
+        "coverage",
+        "index_calculation",
+        "base_period",
+        "contribution_reconciliation"
+      ],
+      "warnings": [
+        "validated_duplicate_flags_present_before_deduplication"
+      ]
     }
   ]
 }
