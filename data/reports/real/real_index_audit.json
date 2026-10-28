@@ -1124,7 +1124,7 @@
     },
     {
       "collection_date": "2026-10-26",
-      "observations": 52714,
+      "observations": 52715,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -1136,8 +1136,52 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 270.9008051550791,
-      "movement_from_base_pct": -2.6490339670385765,
+      "national_index": 270.89954236468833,
+      "movement_from_base_pct": -2.649487763639044,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": [
+        "validated_duplicate_flags_present_before_deduplication"
+      ]
+    },
+    {
+      "collection_date": "2026-10-27",
+      "observations": 49750,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 281.902206967259,
+      "movement_from_base_pct": 4.0615294165978355,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": [
+        "validated_duplicate_flags_present_before_deduplication"
+      ]
+    },
+    {
+      "collection_date": "2026-10-28",
+      "observations": 43142,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 285.7818875527942,
+      "movement_from_base_pct": 1.3762505186721654,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
       "warnings": [
