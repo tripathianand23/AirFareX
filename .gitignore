@@ -52,3 +52,11 @@ data/processed/real/clean_airfare_observations.csv
 data/processed/real/clean_airfare_observations.csv
 data/raw/airfare_index.json
 data/processed/clean_airfare_observations.csv
+
+# AirFareX large generated datasets
+data/processed/real/*.parquet
+data/raw/airfare_index.before_sep28_fix.json
+
+# macOS files
+.DS_Store
+**/.DS_Store

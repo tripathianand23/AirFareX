@@ -32,7 +32,8 @@ python-dotenv
 # Testing
 
 pytest
-
+fastapi
+uvicorn
 boto3
 pyarrow
 duckdb

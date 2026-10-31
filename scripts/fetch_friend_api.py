@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import requests
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 API_URL = "https://mospi-apix-api.onrender.com/api/fares/raw"

@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pandas
+numpy
+pyarrow
+plotly
+duckdb
+boto3
+streamlit
+python-dotenv

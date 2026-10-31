@@ -1055,18 +1055,6 @@ selected_sources = st.sidebar.multiselect(
     available_sources,
 )
 
-if not valid_dates.empty:
-    min_date = valid_dates.min().date()
-    max_date = valid_dates.max().date()
-
-    selected_dates = st.sidebar.date_input(
-        "Collection date range",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date,
-    )
-else:
-    selected_dates = None
 
 clean_with_route = add_route(clean_data)
 
@@ -1275,25 +1263,37 @@ st.markdown(
 # NAVIGATION
 # ============================================================
 
-pages = st.tabs(
-    [
-        "📊 Overview",
-        "📈 Index Analytics",
-        "🗺 Route Intelligence",
-        "⏱ Lead-Time Analysis",
-        "🛡 Data Quality",
-        "📡 Source Health",
-        "🔎 Raw Data Explorer",
-        "⚙️ Automation Control Center",
-    ]
+navigation_options = [
+    "📊 Overview",
+    "📈 Index Analytics",
+    "🗺 Route Intelligence",
+    "⏱ Lead-Time Analysis",
+    "🛡 Data Quality",
+    "📡 Source Health",
+    "🔎 Raw Data Explorer",
+    "⚙️ Automation Control Center",
+]
+
+if "active_page" not in st.session_state:
+    st.session_state.active_page = "📊 Overview"
+
+active_page = st.segmented_control(
+    "Navigation",
+    navigation_options,
+    default=st.session_state.active_page,
+    key="main_navigation",
+    label_visibility="collapsed",
 )
+
+if active_page is not None:
+    st.session_state.active_page = active_page
 
 
 # ============================================================
 # OVERVIEW
 # ============================================================
 
-with pages[0]:
+if active_page == "📊 Overview":
     if filtered_daily.empty:
         st.warning(
             "No precomputed index observations are available "
@@ -1676,7 +1676,7 @@ with pages[0]:
     # INDEX ANALYTICS
     # ============================================================
 
-with pages[1]:
+if active_page == "📈 Index Analytics":
     st.subheader("Index Analytics")
 
     st.markdown(
@@ -1773,7 +1773,7 @@ with pages[1]:
 # ROUTE INTELLIGENCE
 # ============================================================
 
-with pages[2]:
+if active_page == "🗺 Route Intelligence":
     st.subheader("Route Intelligence")
 
     st.markdown(
@@ -1827,10 +1827,73 @@ with pages[2]:
             key="route_index_chart",
         )
 
-        route_chart_table = filtered_routes.copy()
-        keep = [c for c in ["collection_date", "route", "airfare_index"] if c in route_chart_table.columns]
-        if keep:
-            display_chart_data_table("Route Index Data", route_chart_table[keep].tail(50), {"collection_date": "Collection Date", "route": "Route", "airfare_index": "Route Index"})
+        st.subheader("Route Index Data Explorer")
+
+        route_explorer = filtered_routes.copy()
+
+        if route_explorer.empty:
+            st.info("No route-level index data available for the selected filters.")
+        else:
+            explorer_routes = sorted(
+                route_explorer["route"]
+                .dropna()
+                .astype(str)
+                .unique()
+            )
+
+            selected_explorer_route = st.selectbox(
+                "Select Route",
+                ["All Routes"] + explorer_routes,
+                key="route_index_explorer_route",
+            )
+
+            if selected_explorer_route != "All Routes":
+                route_explorer = route_explorer[
+                    route_explorer["route"].astype(str).eq(
+                        selected_explorer_route
+                    )
+                ]
+
+            keep = [
+                c
+                for c in [
+                    "collection_date",
+                    "route",
+                    "airfare_index",
+                ]
+                if c in route_explorer.columns
+            ]
+
+            if keep:
+                route_explorer = route_explorer[keep].copy()
+
+                if "collection_date" in route_explorer.columns:
+                    route_explorer["collection_date"] = pd.to_datetime(
+                        route_explorer["collection_date"],
+                        errors="coerce",
+                    )
+                    route_explorer = route_explorer.sort_values(
+                        "collection_date",
+                        ascending=False,
+                    )
+
+                route_explorer = route_explorer.rename(
+                    columns={
+                        "collection_date": "Collection Date",
+                        "route": "Route",
+                        "airfare_index": "Route Index",
+                    }
+                )
+
+                display_chart_data_table(
+                    "Route Index Data Explorer",
+                    route_explorer,
+                )
+
+                st.caption(
+                    f"Showing {len(route_explorer):,} route-index records. "
+                    "Use the route selector above to inspect a specific route."
+                )
 
         if not movement_table.empty:
             st.subheader("Route Movement Ranking")
@@ -2004,7 +2067,7 @@ with pages[2]:
 # LEAD-TIME ANALYSIS
 # ============================================================
 
-with pages[3]:
+if active_page == "⏱ Lead-Time Analysis":
     st.subheader("Lead-Time Analysis")
 
     st.markdown(
@@ -2120,85 +2183,254 @@ with pages[3]:
         # --------------------------------------------------------
 
         st.subheader(
-            "Observed Fare Distribution by Lead Time"
+            "Lead-Time Fare Distribution"
         )
 
-        lead_summary = lead_time_summary(
-            start_date=(
-                selected_dates[0]
-                if selected_dates
-                and len(selected_dates) == 2
-                else None
-            ),
-            end_date=(
-                selected_dates[1]
-                if selected_dates
-                and len(selected_dates) == 2
-                else None
-            ),
-            routes=selected_routes or None,
-            airlines=selected_airlines or None,
-            sources=selected_sources or None,
-        )
+        if {
+            "advance_days",
+            "total_fare",
+        }.issubset(filtered_clean.columns):
 
-        if lead_summary.empty:
-            st.info(
-                "No lead-time fare observations available "
-                "for the selected filters."
-            )
-        else:
-            lead_fare_fig = px.bar(
-                lead_summary,
-                x="advance_days",
-                y="median_fare",
-                text="median_fare",
-                labels={
-                    "advance_days": "Advance Days",
-                    "median_fare": "Median Fare (INR)",
-                },
+            lead_fares = filtered_clean.copy()
+
+            lead_fares["advance_days"] = pd.to_numeric(
+                lead_fares["advance_days"],
+                errors="coerce",
             )
 
-            lead_fare_fig.update_traces(
-                texttemplate="₹%{text:,.0f}",
-                textposition="outside",
-                hovertemplate=(
-                    "Advance Days: %{x}<br>"
-                    "Median Fare: ₹%{y:,.0f}"
-                    "<extra></extra>"
-                ),
+            lead_fares["total_fare"] = pd.to_numeric(
+                lead_fares["total_fare"],
+                errors="coerce",
             )
 
-            lead_fare_fig.update_layout(
-                height=380,
-                margin=dict(
-                    l=20,
-                    r=20,
-                    t=30,
-                    b=20,
-                ),
+            lead_fares = lead_fares.dropna(
+                subset=[
+                    "advance_days",
+                    "total_fare",
+                ]
             )
 
-            st.plotly_chart(
-                lead_fare_fig,
-                use_container_width=True,
-                key="observed_fare_distribution_by_lead_time",
-            )
+            if not lead_fares.empty:
 
-            lead_fare_table = lead_summary.rename(
-                columns={
-                    "advance_days": "Advance Days",
-                    "observations": "Observations",
-                    "median_fare": "Median Fare (INR)",
-                    "mean_fare": "Mean Fare (INR)",
-                    "min_fare": "Minimum Fare (INR)",
-                    "max_fare": "Maximum Fare (INR)",
-                }
-            ).round(2)
+                # ------------------------------------------------
+                # HIGH-LEVEL LEAD-TIME FARE DISTRIBUTION
+                # ------------------------------------------------
+                lead_summary = (
+                    lead_fares
+                    .groupby("advance_days")["total_fare"]
+                    .agg(
+                        [
+                            "count",
+                            "median",
+                            "mean",
+                            "min",
+                            "max",
+                        ]
+                    )
+                    .reset_index()
+                    .sort_values("advance_days")
+                )
 
-            display_chart_data_table(
-                "Observed Fare Distribution by Lead Time Data",
-                lead_fare_table,
-            )
+                st.dataframe(
+                    lead_summary.rename(
+                        columns={
+                            "advance_days": "Advance Days",
+                            "count": "Observations",
+                            "median": "Median Fare (INR)",
+                            "mean": "Mean Fare (INR)",
+                            "min": "Minimum Fare (INR)",
+                            "max": "Maximum Fare (INR)",
+                        }
+                    ).round(2),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                # ------------------------------------------------
+                # LEAD-TIME FARE DATA EXPLORER
+                # ------------------------------------------------
+                st.subheader(
+                    "Lead-Time Fare Data Explorer"
+                )
+
+                explorer = lead_fares.copy()
+
+                if "collection_date" in explorer.columns:
+                    explorer["collection_date"] = pd.to_datetime(
+                        explorer["collection_date"],
+                        errors="coerce",
+                    )
+
+                # Build route identifier
+                if {
+                    "origin",
+                    "destination",
+                }.issubset(explorer.columns):
+
+                    explorer["route"] = (
+                        explorer["origin"].astype(str)
+                        + "_"
+                        + explorer["destination"].astype(str)
+                    )
+
+                # Available routes
+                if "route" in explorer.columns:
+                    route_options = [
+                        "All Routes"
+                    ] + sorted(
+                        explorer["route"]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                        .tolist()
+                    )
+                else:
+                    route_options = [
+                        "All Routes"
+                    ]
+
+                # Available lead-time windows
+                lead_options = sorted(
+                    explorer["advance_days"]
+                    .dropna()
+                    .astype(int)
+                    .unique()
+                    .tolist()
+                )
+
+                lead_labels = [
+                    "All Lead Times"
+                ] + [
+                    f"T+{days}"
+                    for days in lead_options
+                ]
+
+                filter_col1, filter_col2 = st.columns(2)
+
+                with filter_col1:
+                    selected_lead = st.selectbox(
+                        "Select Lead Time",
+                        lead_labels,
+                        key="lead_time_fare_explorer_lead",
+                    )
+
+                with filter_col2:
+                    selected_route = st.selectbox(
+                        "Select Route",
+                        route_options,
+                        key="lead_time_fare_explorer_route",
+                    )
+
+                # Apply lead-time filter
+                if selected_lead != "All Lead Times":
+
+                    selected_days = int(
+                        selected_lead.replace(
+                            "T+",
+                            "",
+                        )
+                    )
+
+                    explorer = explorer[
+                        explorer["advance_days"].eq(
+                            selected_days
+                        )
+                    ]
+
+                # Apply route filter
+                if selected_route != "All Routes":
+
+                    explorer = explorer[
+                        explorer["route"].eq(
+                            selected_route
+                        )
+                    ]
+
+                if explorer.empty:
+
+                    st.info(
+                        "No lead-time fare data is available "
+                        "for the selected filters."
+                    )
+
+                else:
+
+                    # --------------------------------------------
+                    # Aggregate observations for exploration
+                    # --------------------------------------------
+                    group_columns = [
+                        "collection_date",
+                        "route",
+                        "advance_days",
+                    ]
+
+                    group_columns = [
+                        column
+                        for column in group_columns
+                        if column in explorer.columns
+                    ]
+
+                    if group_columns:
+
+                        explorer_summary = (
+                            explorer
+                            .groupby(group_columns)[
+                                "total_fare"
+                            ]
+                            .agg(
+                                observations="count",
+                                median_fare="median",
+                                mean_fare="mean",
+                                minimum_fare="min",
+                                maximum_fare="max",
+                            )
+                            .reset_index()
+                        )
+
+                        explorer_summary = (
+                            explorer_summary
+                            .sort_values(
+                                group_columns,
+                                ascending=False,
+                            )
+                        )
+
+                        explorer_summary = (
+                            explorer_summary.rename(
+                                columns={
+                                    "collection_date":
+                                        "Collection Date",
+                                    "route":
+                                        "Route",
+                                    "advance_days":
+                                        "Advance Days",
+                                    "observations":
+                                        "Observations",
+                                    "median_fare":
+                                        "Median Fare (INR)",
+                                    "mean_fare":
+                                        "Mean Fare (INR)",
+                                    "minimum_fare":
+                                        "Minimum Fare (INR)",
+                                    "maximum_fare":
+                                        "Maximum Fare (INR)",
+                                }
+                            )
+                        )
+
+                        st.dataframe(
+                            explorer_summary.round(2),
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+                        st.caption(
+                            f"Showing "
+                            f"{len(explorer_summary):,} "
+                            "lead-time fare records. "
+                            "Use the filters above to inspect "
+                            "a specific lead-time window or route."
+                        )
 
         st.info(
             "**Interpretation caution:** differences across lead-time "
@@ -2206,11 +2438,13 @@ with pages[3]:
             "They should not be called demand elasticity without a "
             "proper longitudinal identification design."
         )
+
+
 # ============================================================
 # DATA QUALITY
 # ============================================================
 
-with pages[4]:
+if active_page == "🛡 Data Quality":
     st.subheader("Data Quality Command Center")
 
     st.markdown(
@@ -2310,75 +2544,89 @@ with pages[4]:
 
     st.divider()
 
-    st.markdown("#### Automated Audit Gates")
-
-    audit_checks = [
-        ("Structural validation", "structural_validation_pass"),
-        ("Duplicate QC", "duplicate_qc_pass"),
-        ("Representative fares", "representative_fares_pass"),
-        ("Index calculation", "index_calculation_pass"),
-        ("Contribution reconciliation", "contribution_reconciliation_pass"),
-        ("Base-period check", "base_period_pass"),
-    ]
-
-    gate_cols = st.columns(3)
-
-    for i, (label, key) in enumerate(audit_checks):
-        value = bool_value(
-            latest_audit,
-            key,
-        )
-
-        with gate_cols[i % 3]:
-            if value is True:
-                st.success(
-                    f"✓ {label}: PASS"
-                )
-            elif value is False:
-                st.error(
-                    f"✕ {label}: FAIL"
-                )
-            else:
-                st.info(
-                    f"• {label}: NOT AVAILABLE"
-                )
-
-    if latest_audit.get("failed_checks"):
-        st.error(
-            f"Failed checks: {latest_audit['failed_checks']}"
-        )
-
-    if latest_audit.get("warnings"):
-        st.warning(
-            f"Audit warnings: {latest_audit['warnings']}"
-        )
-
-    st.divider()
-
     st.subheader("Potential Fare Anomalies")
 
-    anomaly_data = detect_fare_anomalies(
-        filtered_clean
-    )
+    # Monitoring-only anomaly detection.
+    # Route-level IQR bounds are calculated once in DuckDB and reused
+    # for both the anomaly statistics and the review table.
+    anomaly_conn = None
 
-    if anomaly_data.empty:
-        st.info(
-            "No anomaly-monitoring data available."
+    try:
+        from dashboard.observation_store import _connection
+
+        anomaly_conn = _connection()
+
+        anomaly_conn.execute(
+            """
+            CREATE OR REPLACE TEMP TABLE anomaly_bounds AS
+            SELECT
+                UPPER(
+                    TRIM(origin)
+                    || '_'
+                    || TRIM(destination)
+                ) AS route,
+                quantile_cont(
+                    TRY_CAST(total_fare AS DOUBLE),
+                    0.25
+                ) AS q1,
+                quantile_cont(
+                    TRY_CAST(total_fare AS DOUBLE),
+                    0.75
+                ) AS q3
+            FROM observations
+            WHERE origin IS NOT NULL
+              AND destination IS NOT NULL
+              AND total_fare IS NOT NULL
+              AND TRY_CAST(total_fare AS DOUBLE) IS NOT NULL
+            GROUP BY
+                UPPER(
+                    TRIM(origin)
+                    || '_'
+                    || TRIM(destination)
+                )
+            """
         )
-    else:
-        anomaly_count = (
-            int(
-                anomaly_data["anomaly_flag"].sum()
+
+        anomaly_stats = anomaly_conn.execute(
+            """
+            WITH valid AS (
+                SELECT
+                    total_fare,
+                    UPPER(
+                        TRIM(origin)
+                        || '_'
+                        || TRIM(destination)
+                    ) AS route
+                FROM observations
+                WHERE origin IS NOT NULL
+                  AND destination IS NOT NULL
+                  AND total_fare IS NOT NULL
+                  AND TRY_CAST(total_fare AS DOUBLE) IS NOT NULL
             )
-            if "anomaly_flag" in anomaly_data
-            else 0
-        )
+            SELECT
+                COUNT(*) AS records_reviewed,
+                SUM(
+                    CASE
+                        WHEN TRY_CAST(v.total_fare AS DOUBLE)
+                             < (b.q1 - 1.5 * (b.q3 - b.q1))
+                          OR TRY_CAST(v.total_fare AS DOUBLE)
+                             > (b.q3 + 1.5 * (b.q3 - b.q1))
+                        THEN 1
+                        ELSE 0
+                    END
+                ) AS anomaly_count
+            FROM valid v
+            INNER JOIN anomaly_bounds b
+                ON v.route = b.route
+            """
+        ).fetchone()
+
+        records_reviewed = int(anomaly_stats[0] or 0)
+        anomaly_count = int(anomaly_stats[1] or 0)
 
         anomaly_rate = (
-            anomaly_count
-            / len(anomaly_data)
-            * 100
-            if len(anomaly_data)
+            anomaly_count / records_reviewed * 100
+            if records_reviewed
             else 0
         )
 
@@ -2396,18 +2644,10 @@ with pages[4]:
 
         a3.metric(
             "Records Reviewed",
-            f"{len(anomaly_data):,}",
+            f"{records_reviewed:,}",
         )
 
-        flagged = (
-            anomaly_data[
-                anomaly_data["anomaly_flag"]
-            ].copy()
-            if "anomaly_flag" in anomaly_data
-            else pd.DataFrame()
-        )
-
-        if flagged.empty:
+        if anomaly_count == 0:
             st.success(
                 "No potential fare anomalies detected."
             )
@@ -2417,6 +2657,46 @@ with pages[4]:
                 "Extreme prices are not automatically deleted because "
                 "they may represent genuine market behaviour."
             )
+
+            flagged = anomaly_conn.execute(
+                """
+                SELECT
+                    o.collection_timestamp,
+                    o.origin,
+                    o.destination,
+                    o.airline,
+                    o.advance_days,
+                    o.base_fare,
+                    o.taxes,
+                    o.total_fare,
+                    UPPER(
+                        TRIM(o.origin)
+                        || '_'
+                        || TRIM(o.destination)
+                    ) AS route,
+                    TRUE AS anomaly_flag
+                FROM observations o
+                INNER JOIN anomaly_bounds b
+                    ON UPPER(
+                        TRIM(o.origin)
+                        || '_'
+                        || TRIM(o.destination)
+                    ) = b.route
+                WHERE o.origin IS NOT NULL
+                  AND o.destination IS NOT NULL
+                  AND o.total_fare IS NOT NULL
+                  AND TRY_CAST(o.total_fare AS DOUBLE) IS NOT NULL
+                  AND (
+                      TRY_CAST(o.total_fare AS DOUBLE)
+                      < (b.q1 - 1.5 * (b.q3 - b.q1))
+                      OR
+                      TRY_CAST(o.total_fare AS DOUBLE)
+                      > (b.q3 + 1.5 * (b.q3 - b.q1))
+                  )
+                ORDER BY o.collection_timestamp DESC
+                LIMIT 100
+                """
+            ).fetchdf()
 
             cols = [
                 c
@@ -2428,7 +2708,6 @@ with pages[4]:
                     "advance_days",
                     "base_fare",
                     "taxes",
-                    "consumer_fare",
                     "total_fare",
                     "route",
                     "anomaly_flag",
@@ -2436,24 +2715,36 @@ with pages[4]:
                 if c in flagged.columns
             ]
 
-            anomaly_display = flagged[cols].head(100).copy()
-            anomaly_display = anomaly_display.rename(columns={
-                "base_fare": "Base Fare (INR)",
-                "taxes": "Taxes & Fees (INR)",
-                "consumer_fare": "Consumer Fare (INR)",
-                "total_fare": "Source Total (INR)",
-            })
-
-            st.caption(
-                "Consumer Fare = Base Fare + Taxes & Fees. "
-                "Source Total is retained separately for reconciliation."
+            anomaly_display = (
+                flagged[cols]
+                .head(100)
+                .copy()
             )
+
+            anomaly_display = anomaly_display.rename(
+                columns={
+                    "base_fare": "Base Fare (INR)",
+                    "taxes": "Taxes & Fees (INR)",
+                    "total_fare": "Source Total (INR)",
+                }
+            )
+
             st.dataframe(
                 anomaly_display,
                 use_container_width=True,
                 hide_index=True,
             )
 
+    except Exception as exc:
+        st.warning(
+            "Anomaly monitoring is temporarily unavailable. "
+            f"Details: {exc}"
+        )
+
+    finally:
+        if anomaly_conn is not None:
+            anomaly_conn.close()
+
 
 # ============================================================
 # SOURCE HEALTH
@@ -2463,7 +2754,7 @@ with pages[4]:
 # SOURCE HEALTH
 # ============================================================
 
-with pages[5]:
+if active_page == "📡 Source Health":
 
     st.subheader("Source Health & Observation Coverage")
 
@@ -2759,7 +3050,7 @@ with pages[5]:
 # RAW DATA EXPLORER
 # ============================================================
 
-with pages[6]:
+if active_page == "🔎 Raw Data Explorer":
 
     st.subheader("Raw Airfare Data Explorer")
 
@@ -2861,7 +3152,7 @@ with pages[6]:
 # AUTOMATION CONTROL CENTER
 # ============================================================
 
-with pages[7]:
+if active_page == "⚙️ Automation Control Center":
     st.subheader(
         "Smart Automation Control Center"
     )
@@ -2873,6 +3164,63 @@ with pages[7]:
         '</div>',
         unsafe_allow_html=True,
     )
+
+    # --------------------------------------------------------
+    # Automated Audit Gates
+    # --------------------------------------------------------
+
+    st.markdown("#### Automated Audit Gates")
+
+    audit_checks = [
+        ("Structural validation", "structural_validation_pass"),
+        ("Duplicate QC", "duplicate_qc_pass"),
+        ("Representative fares", "representative_fares_pass"),
+        ("Index calculation", "index_calculation_pass"),
+        ("Contribution reconciliation", "contribution_reconciliation_pass"),
+        ("Base-period check", "base_period_pass"),
+    ]
+
+    gate_cols = st.columns(3)
+
+    for i, (label, key) in enumerate(audit_checks):
+        value = bool_value(
+            latest_audit,
+            key,
+        )
+
+        with gate_cols[i % 3]:
+            if value is True:
+                st.success(
+                    f"✓ {label}: PASS"
+                )
+            elif value is False:
+                st.error(
+                    f"✕ {label}: FAIL"
+                )
+            else:
+                st.info(
+                    f"• {label}: NOT AVAILABLE"
+                )
+
+    if latest_audit.get("failed_checks"):
+        failed_checks_display = str(
+            latest_audit["failed_checks"]
+        ).replace("_", " ").title()
+
+        st.error(
+            f"Failed Checks: {failed_checks_display}"
+        )
+
+    if latest_audit.get("warnings"):
+        warnings_display = str(
+            latest_audit["warnings"]
+        ).replace("_", " ").title()
+
+        st.warning(
+            f"Audit Warnings: {warnings_display}"
+        )
+
+    st.divider()
 
     # --------------------------------------------------------
     # Publication gate
@@ -2895,7 +3243,12 @@ with pages[7]:
 
     if latest_audit:
         audit_display = {
-            k: v
+            (
+                str(k)
+                .replace("_", " ")
+                .strip()
+                .title()
+            ): v
             for k, v in latest_audit.items()
             if k != "_date"
         }
@@ -2932,6 +3285,25 @@ with pages[7]:
                 coverage_display[date_col],
                 errors="coerce",
             )
+
+        coverage_display = coverage_display.rename(
+            columns={
+                "collection_date": "Collection Date",
+                "routes_present": "Routes Present",
+                "expected_routes": "Expected Routes",
+                "route_coverage_ratio": "Route Coverage Ratio",
+                "lead_windows_present": "Lead Windows Present",
+                "expected_lead_windows": "Expected Lead Windows",
+                "lead_time_coverage_ratio": "Lead Time Coverage Ratio",
+                "observed_strata": "Observed Strata",
+                "required_strata": "Required Strata",
+                "stratum_coverage_ratio": "Stratum Coverage Ratio",
+                "missing_routes": "Missing Routes",
+                "missing_lead_windows": "Missing Lead Windows",
+                "coverage_complete": "Coverage Complete",
+                "coverage_status": "Coverage Status",
+            }
+        )
 
         st.dataframe(
             coverage_display.tail(30),

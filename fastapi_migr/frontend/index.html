@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AirFareX</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✈️</text></svg>">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+    <div id="loading-badge" class="loading-overlay">
+        <div class="spinner"></div>
+        <span>Updating data...</span>
+    </div>
+
+    <div class="app-layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <span>✈️</span>
+                <span>Airfare Index</span>
+            </div>
+            <hr class="sidebar-divider">
+
+            <!-- Date Range -->
+            <div class="sidebar-group">
+                <span class="sidebar-label">Collection date range</span>
+                <div class="date-range-container">
+                    <div class="date-input-wrap">
+                        <span class="date-input-sublabel">Start:</span>
+                        <input type="date" id="filter-start-date" class="sidebar-input">
+                    </div>
+                    <div class="date-input-wrap">
+                        <span class="date-input-sublabel">End:</span>
+                        <input type="date" id="filter-end-date" class="sidebar-input">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Routes Multi-select -->
+            <div class="sidebar-group">
+                <span class="sidebar-label">Routes</span>
+                <div class="multi-select-box" id="routes-multiselect">
+                    <div class="multi-select-toggle" tabindex="0">
+                        <span class="multi-select-placeholder">Choose routes</span>
+                    </div>
+                    <div class="multi-select-dropdown">
+                        <input type="text" class="multi-select-search" placeholder="Search routes...">
+                        <div class="multi-select-options"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Airlines Multi-select -->
+            <div class="sidebar-group">
+                <span class="sidebar-label">Airlines</span>
+                <div class="multi-select-box" id="airlines-multiselect">
+                    <div class="multi-select-toggle" tabindex="0">
+                        <span class="multi-select-placeholder">Choose airlines</span>
+                    </div>
+                    <div class="multi-select-dropdown">
+                        <input type="text" class="multi-select-search" placeholder="Search airlines...">
+                        <div class="multi-select-options"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sources Multi-select -->
+            <div class="sidebar-group">
+                <span class="sidebar-label">Sources</span>
+                <div class="multi-select-box" id="sources-multiselect">
+                    <div class="multi-select-toggle" tabindex="0">
+                        <span class="multi-select-placeholder">Choose sources</span>
+                    </div>
+                    <div class="multi-select-dropdown">
+                        <input type="text" class="multi-select-search" placeholder="Search sources...">
+                        <div class="multi-select-options"></div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="sidebar-divider">
+
+            <div class="sidebar-caption">
+                Filters below affect exploratory views only. They never recalculate the headline index.
+            </div>
+
+            <button id="btn-refresh" class="btn-refresh">
+                <span>🔄</span>
+                <span>Refresh statistical datasets</span>
+            </button>
+        </aside>
+
+        <!-- MAIN VIEW -->
+        <main class="main-wrapper">
+            <div class="block-container">
+                <!-- TOP SHELL / GLASS HEADER -->
+                <div class="top-shell">
+                    <div class="hero">
+                        <h1>AirFareX</h1>
+                    </div>
+                    <div class="judge-strip">
+                        <div class="judge-card">
+                            <div class="label">Headline index</div>
+                            <div class="value" id="hdr-headline-index">—</div>
+                        </div>
+                        <div class="judge-card">
+                            <div class="label">Latest date</div>
+                            <div class="value" id="hdr-latest-date">—</div>
+                        </div>
+                        <div class="judge-card">
+                            <div class="label">Routes</div>
+                            <div class="value" id="hdr-routes">—</div>
+                        </div>
+                        <div class="judge-card">
+                            <div class="label">Lead windows</div>
+                            <div class="value" id="hdr-lead-windows">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NAVIGATION / SEGMENTED CONTROL -->
+                <nav class="nav-segmented" id="main-navigation">
+                    <button class="nav-item active" data-tab="overview">📊 Overview</button>
+                    <button class="nav-item" data-tab="index-analytics">📈 Index Analytics</button>
+                    <button class="nav-item" data-tab="route-intelligence">🗺 Route Intelligence</button>
+                    <button class="nav-item" data-tab="lead-time">⏱ Lead-Time Analysis</button>
+                    <button class="nav-item" data-tab="data-quality">🛡 Data Quality</button>
+                    <button class="nav-item" data-tab="source-health">📡 Source Health</button>
+                    <button class="nav-item" data-tab="raw-explorer">🔎 Raw Data Explorer</button>
+                    <button class="nav-item" data-tab="automation">⚙️ Automation Control Center</button>
+                </nav>
+
+                <!-- TAB 1: OVERVIEW -->
+                <section class="tab-content active" id="tab-overview">
+                    <h3 class="st-subheader">Airfare Price Index at a Glance</h3>
+                    <div class="grid-cols-6" id="overview-kpis">
+                        <div class="st-metric latest-index-card">
+                            <div class="st-metric-label">Latest Index</div>
+                            <div class="st-metric-value" id="ov-latest-index">—</div>
+                            <div class="st-metric-delta" id="ov-period-change">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Previous Index</div>
+                            <div class="st-metric-value" id="ov-prev-index">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Total Observations</div>
+                            <div class="st-metric-value" id="ov-total-obs">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Total Routes</div>
+                            <div class="st-metric-value" id="ov-total-routes">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Airline Labels</div>
+                            <div class="st-metric-value" id="ov-airline-count">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Total Sources</div>
+                            <div class="st-metric-value" id="ov-source-count">—</div>
+                        </div>
+                    </div>
+
+                    <div class="callout movement-callout" id="ov-movement-callout">
+                        <b>Base = 100</b> · Latest movement — · 7-day movement — · 30-day movement —
+                    </div>
+
+                    <h3 class="st-subheader">Airfare Price Index (India)</h3>
+                    <div id="ov-overall-chart" class="chart-container"></div>
+                    <div id="ov-overall-table"></div>
+
+                    <!-- Secondary analytical panels -->
+                    <div class="grid-cols-split">
+                        <div>
+                            <h3 class="st-subheader">Route-wise Index</h3>
+                            <div id="ov-route-pulse-chart" class="chart-container"></div>
+                            <div id="ov-route-pulse-table"></div>
+                        </div>
+                        <div>
+                            <h3 class="st-subheader">Lead Time Price Index</h3>
+                            <div id="ov-lead-chart" class="chart-container"></div>
+                            <div id="ov-lead-table"></div>
+                        </div>
+                    </div>
+
+                    <!-- Source coverage + Data quality -->
+                    <div class="grid-cols-split">
+                        <div>
+                            <h3 class="st-subheader">Source Coverage</h3>
+                            <div id="ov-source-pie-chart" class="chart-container"></div>
+                        </div>
+                        <div>
+                            <h3 class="st-subheader">Data Quality</h3>
+                            <div id="ov-quality-gauge" class="chart-container" style="min-height: 250px;"></div>
+                            <div id="ov-quality-table"></div>
+                            <div class="grid-cols-3" style="margin-top: 1rem;">
+                                <div class="st-metric">
+                                    <div class="st-metric-label">Missing</div>
+                                    <div class="st-metric-value" id="ov-qa-missing" style="font-size: 1.45rem;">—</div>
+                                </div>
+                                <div class="st-metric">
+                                    <div class="st-metric-label">Duplicates</div>
+                                    <div class="st-metric-value" id="ov-qa-duplicates" style="font-size: 1.45rem;">—</div>
+                                </div>
+                                <div class="st-metric">
+                                    <div class="st-metric-label">Quality</div>
+                                    <div class="st-metric-value" id="ov-qa-quality" style="font-size: 1.45rem;">—</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 2: INDEX ANALYTICS -->
+                <section class="tab-content" id="tab-index-analytics">
+                    <h3 class="st-subheader">Index Analytics</h3>
+                    <div class="section-note">
+                        Daily, weekly and monthly diagnostic views of the precomputed national statistical index.
+                    </div>
+
+                    <div id="idx-main-chart" class="chart-container"></div>
+                    <div id="idx-main-table"></div>
+
+                    <div class="grid-cols-2">
+                        <div>
+                            <h4 class="st-heading">Weekly View</h4>
+                            <div id="idx-weekly-table"></div>
+                        </div>
+                        <div>
+                            <h4 class="st-heading">Monthly View</h4>
+                            <div id="idx-monthly-table"></div>
+                        </div>
+                    </div>
+
+                    <h4 class="st-heading">Daily Index Audit Trail</h4>
+                    <div id="idx-audit-trail-table"></div>
+                    <div class="st-caption">
+                        The index values above come directly from the precomputed statistical index artifact.
+                    </div>
+                </section>
+
+                <!-- TAB 3: ROUTE INTELLIGENCE -->
+                <section class="tab-content" id="tab-route-intelligence">
+                    <h3 class="st-subheader">Route Intelligence</h3>
+                    <div class="section-note">
+                        Route-level diagnostics for movement, dispersion and observed fare structure. These views do not redefine the national index.
+                    </div>
+
+                    <div class="grid-cols-4" id="route-kpi-row">
+                        <div class="st-metric">
+                            <div class="st-metric-label">Routes Analysed</div>
+                            <div class="st-metric-value" id="rt-analysed">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Largest Increase</div>
+                            <div class="st-metric-value" id="rt-largest-inc" style="font-size: 1.35rem;">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Largest Decrease</div>
+                            <div class="st-metric-value" id="rt-largest-dec" style="font-size: 1.35rem;">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Median Latest Route Index</div>
+                            <div class="st-metric-value" id="rt-median-idx">—</div>
+                        </div>
+                    </div>
+
+                    <div id="rt-indices-chart" class="chart-container" style="min-height: 420px;"></div>
+
+                    <h3 class="st-subheader">Route Index Data Explorer</h3>
+                    <div class="filter-row">
+                        <label for="route-explorer-select" style="font-weight: 600; font-size: 0.85rem; color: #344257;">Select Route</label>
+                        <select id="route-explorer-select" class="form-select">
+                            <option value="All Routes">All Routes</option>
+                        </select>
+                    </div>
+                    <div id="rt-explorer-table"></div>
+                    <div class="st-caption" id="rt-explorer-caption">
+                        Showing route-index records. Use the route selector above to inspect a specific route.
+                    </div>
+
+                    <h3 class="st-subheader">Route Movement Ranking</h3>
+                    <div id="rt-ranking-table"></div>
+
+                    <h3 class="st-subheader">Route × Lead-Time Observed Fare Structure</h3>
+                    <div id="rt-heatmap-chart" class="chart-container"></div>
+                    <div id="rt-heatmap-table"></div>
+                    <div class="st-caption">
+                        Exploratory median fare matrix. It is not a second national-index calculation.
+                    </div>
+
+                    <h3 class="st-subheader">Observed Route Coverage</h3>
+                    <div id="rt-coverage-table"></div>
+                </section>
+
+                <!-- TAB 4: LEAD-TIME ANALYSIS -->
+                <section class="tab-content" id="tab-lead-time">
+                    <h3 class="st-subheader">Lead-Time Analysis</h3>
+                    <div class="section-note">
+                        Configured advance-purchase windows: 1, 7, 15, 30 and 45 days. The index engine currently uses equal lead-time weighting.
+                    </div>
+
+                    <div id="lead-main-chart" class="chart-container" style="min-height: 400px;"></div>
+                    <div id="lead-chart-table"></div>
+
+                    <h3 class="st-subheader">Latest Lead-Time Statistical Snapshot</h3>
+                    <div id="lead-snapshot-table"></div>
+
+                    <h3 class="st-subheader">Observed Fare Distribution by Lead Time</h3>
+                    <div class="st-caption">
+                        Observed fare statistics across the available booking lead-time windows.
+                    </div>
+                    <div id="lead-distribution-table"></div>
+
+                    <h3 class="st-subheader">Lead-Time Fare Data Explorer</h3>
+                    <div class="st-caption">
+                        Explore observed fares by collection date, route, and booking lead-time window.
+                    </div>
+
+                    <div class="grid-cols-2">
+                        <div>
+                            <label for="lead-filter-advance" style="font-weight: 600; font-size: 0.82rem; color: #344257; display: block; margin-bottom: 4px;">Select Lead Time</label>
+                            <select id="lead-filter-advance" class="form-select" style="width: 100%;">
+                                <option value="All Lead Times">All Lead Times</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="lead-filter-route" style="font-weight: 600; font-size: 0.82rem; color: #344257; display: block; margin-bottom: 4px;">Select Route</label>
+                            <select id="lead-filter-route" class="form-select" style="width: 100%;">
+                                <option value="All Routes">All Routes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="lead-explorer-table" style="margin-top: 1rem;"></div>
+                    <div class="st-caption" id="lead-explorer-caption">
+                        Showing lead-time fare records. Use the filters above to inspect a specific lead-time window or route.
+                    </div>
+
+                    <div class="st-alert st-alert-info" style="margin-top: 1.5rem;">
+                        <span>ℹ️</span>
+                        <span><b>Interpretation Caution:</b> differences across lead-time windows show lead-time differentiated price movement. They should not be called demand elasticity without a proper longitudinal identification design.</span>
+                    </div>
+                </section>
+
+                <!-- TAB 5: DATA QUALITY -->
+                <section class="tab-content" id="tab-data-quality">
+                    <h3 class="st-subheader">Data Quality Command Center</h3>
+                    <div class="section-note">
+                        Operational QC signals derived from the processed observation layer and automated validation outputs.
+                    </div>
+
+                    <div class="grid-cols-5" id="dq-kpis">
+                        <div class="st-metric">
+                            <div class="st-metric-label">Dashboard Observations</div>
+                            <div class="st-metric-value" id="dq-total-obs">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Missing Fare</div>
+                            <div class="st-metric-value" id="dq-missing-fare">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Duplicate Rate</div>
+                            <div class="st-metric-value" id="dq-dup-rate">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Operational Quality Score</div>
+                            <div class="st-metric-value" id="dq-score">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Status</div>
+                            <div class="st-metric-value" id="dq-status" style="font-size: 1.6rem;">—</div>
+                        </div>
+                    </div>
+
+                    <div class="st-caption">
+                        The composite Quality Score is an engineering monitoring metric, not an official statistical quality standard.
+                    </div>
+
+                    <hr class="st-divider">
+
+                    <h3 class="st-subheader">Potential Fare Anomalies</h3>
+                    <div class="grid-cols-3" style="margin-bottom: 1rem;">
+                        <div class="st-metric">
+                            <div class="st-metric-label">Potential Anomalies</div>
+                            <div class="st-metric-value" id="anom-count">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Anomaly Rate</div>
+                            <div class="st-metric-value" id="anom-rate">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Records Reviewed</div>
+                            <div class="st-metric-value" id="anom-reviewed">—</div>
+                        </div>
+                    </div>
+
+                    <div id="anom-alert-container"></div>
+                    <div id="anom-table"></div>
+                </section>
+
+                <!-- TAB 6: SOURCE HEALTH -->
+                <section class="tab-content" id="tab-source-health">
+                    <h3 class="st-subheader">Source Health & Observation Coverage</h3>
+                    <div class="section-note">
+                        This view reports observed source contribution from the cloud-backed processed observation dataset. It does not fabricate API latency or source success rates.
+                    </div>
+
+                    <div class="grid-cols-4" id="sh-kpis">
+                        <div class="st-metric">
+                            <div class="st-metric-label">Total Observations</div>
+                            <div class="st-metric-value" id="sh-total-obs">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Observed Sources</div>
+                            <div class="st-metric-value" id="sh-obs-sources">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Source Coverage</div>
+                            <div class="st-metric-value" id="sh-coverage">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Largest Source Share</div>
+                            <div class="st-metric-value" id="sh-largest-share">—</div>
+                        </div>
+                    </div>
+
+                    <hr class="st-divider">
+
+                    <div class="grid-cols-split-sources">
+                        <div>
+                            <h4 class="st-heading">Observation Share by Source</h4>
+                            <div id="sh-share-chart" class="chart-container"></div>
+                            <div id="sh-share-table"></div>
+                        </div>
+                        <div>
+                            <h4 class="st-heading">Source Concentration Signal</h4>
+                            <div id="sh-concentration-alert"></div>
+                            <div class="st-metric" style="margin: 1rem 0;">
+                                <div class="st-metric-label">Observation Window</div>
+                                <div class="st-metric-value" id="sh-obs-window" style="font-size: 1.25rem;">—</div>
+                            </div>
+                            <div class="st-caption">
+                                This is an observed concentration signal, not a formal reliability score.
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="st-subheader">Source Coverage</h3>
+                    <div id="sh-coverage-table"></div>
+
+                    <div class="st-alert st-alert-info" style="margin-top: 1.5rem;">
+                        <span>ℹ️</span>
+                        <span><b>No fake runtime health:</b> live collector health will be displayed here only after actual collection-cycle telemetry is connected to the ingestion service.</span>
+                    </div>
+                </section>
+
+                <!-- TAB 7: RAW DATA EXPLORER -->
+                <section class="tab-content" id="tab-raw-explorer">
+                    <h3 class="st-subheader">Raw Airfare Data Explorer</h3>
+                    <div class="section-note">
+                        Raw observations are queried directly from the clean Parquet store using paginated database-style access. The complete dataset is never loaded into browser memory.
+                    </div>
+
+                    <div class="filter-row">
+                        <div>
+                            <label for="raw-page-size" style="font-weight: 600; font-size: 0.82rem; color: #344257; display: block; margin-bottom: 4px;">Rows per page</label>
+                            <select id="raw-page-size" class="form-select">
+                                <option value="25">25</option>
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                                <option value="250">250</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="raw-page-number" style="font-weight: 600; font-size: 0.82rem; color: #344257; display: block; margin-bottom: 4px;">Page</label>
+                            <input type="number" id="raw-page-number" class="form-number" min="1" value="1">
+                        </div>
+                    </div>
+
+                    <div class="grid-cols-3" style="margin-bottom: 1rem;">
+                        <div class="st-metric">
+                            <div class="st-metric-label">Matching Observations</div>
+                            <div class="st-metric-value" id="raw-matching-obs">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Page</div>
+                            <div class="st-metric-value" id="raw-page-indicator">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Rows Loaded</div>
+                            <div class="st-metric-value" id="raw-rows-loaded">—</div>
+                        </div>
+                    </div>
+
+                    <div id="raw-data-table"></div>
+
+                    <div class="pager-container">
+                        <button id="raw-prev-btn" class="pager-btn">← Previous</button>
+                        <span id="raw-page-status">Page 1</span>
+                        <button id="raw-next-btn" class="pager-btn">Next →</button>
+                    </div>
+                </section>
+
+                <!-- TAB 8: AUTOMATION CONTROL CENTER -->
+                <section class="tab-content" id="tab-automation">
+                    <h3 class="st-subheader">Smart Automation Control Center</h3>
+                    <div class="section-note">
+                        The control center is audit-driven: it reports what the pipeline actually produced instead of inventing source execution metrics.
+                    </div>
+
+                    <h4 class="st-heading">Automated Audit Gates</h4>
+                    <div class="grid-cols-3" id="auto-gates-container"></div>
+                    <div id="auto-failed-banner"></div>
+                    <div id="auto-warnings-banner"></div>
+
+                    <hr class="st-divider">
+
+                    <!-- Publication Gate Banner -->
+                    <div id="auto-pub-banner" class="st-alert"></div>
+
+                    <h4 class="st-heading">Latest Audit Record</h4>
+                    <div class="json-box" id="auto-audit-json"></div>
+
+                    <hr class="st-divider">
+
+                    <h4 class="st-heading">Coverage Gate</h4>
+                    <div id="auto-coverage-table"></div>
+
+                    <hr class="st-divider">
+
+                    <h4 class="st-heading">Automated Statistical Pipeline</h4>
+                    <div id="auto-pipeline-stages" style="background: #fff; border: 1px solid #dfe5ec; border-radius: 10px; overflow: hidden; margin: 0.6rem 0 1.2rem;"></div>
+
+                    <hr class="st-divider">
+
+                    <h4 class="st-heading">Pipeline Provenance</h4>
+                    <div id="auto-provenance-table"></div>
+
+                    <hr class="st-divider">
+
+                    <h4 class="st-heading">Resilience Policy</h4>
+                    <div id="auto-resilience-table"></div>
+                    <div class="st-caption">
+                        These are configured resilience rules. They are not presented as evidence that a retry event occurred in the current dataset.
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
