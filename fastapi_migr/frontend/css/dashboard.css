@@ -1164,3 +1164,31 @@ body {
     overflow-x: hidden;
 }
 
+
+/* AIRFAREX: PERMANENTLY HIDE LEFT SIDEBAR */
+
+html body .app-layout > aside.sidebar {
+    display: none !important;
+}
+
+/* Expand the dashboard to full available width */
+html body .app-layout {
+    display: flex !important;
+    width: 100% !important;
+    min-height: 100vh;
+}
+
+html body .app-layout > main.main-wrapper {
+    display: block !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+}
+
+/* Remove leftover sidebar spacing */
+html body .app-layout > main.main-wrapper .block-container {
+    width: 100% !important;
+    max-width: 100% !important;
+}
