@@ -9,6 +9,26 @@
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
+    <!-- AirFareX page-load intro transition -->
+    <section id="airfarex-intro" class="airfarex-intro" aria-label="AirFareX introduction">
+        <div class="airfarex-intro-aircraft-wrap" aria-hidden="true">
+            <img
+                class="airfarex-intro-aircraft"
+                src="/static/airfarex-aircraft.png"
+                alt=""
+                fetchpriority="high"
+            >
+        </div>
+        <div class="airfarex-intro-copy">
+            <p class="airfarex-intro-eyebrow">Government of India · Statistical analysis</p>
+            <h1 class="airfarex-intro-brand">AirFare<span>X</span></h1>
+            <p class="airfarex-intro-system-name">Airfare Analysis System for MoSPI</p>
+            <p class="airfarex-intro-department">Ministry of Statistics and Programme Implementation</p>
+            <div class="airfarex-intro-progress"><span></span></div>
+            <p class="airfarex-intro-loading-label">Preparing dashboard</p>
+        </div>
+    </section>
+
     <div id="loading-badge" class="loading-overlay">
         <div class="spinner"></div>
         <span>Updating data...</span>
@@ -551,6 +571,7 @@
         </main>
     </div>
 
+    <script src="/static/js/intro-transition.js"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
