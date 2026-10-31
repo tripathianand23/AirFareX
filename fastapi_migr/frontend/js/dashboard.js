@@ -761,13 +761,13 @@ async function bootstrap() {
         // Setup date bounds
         const startInput = document.getElementById("filter-start-date");
         const endInput = document.getElementById("filter-end-date");
-        if (startInput && meta.min_date) {
+        if (meta.min_date) {
             startInput.min = meta.min_date;
             startInput.value = meta.min_date;
             state.filters.startDate = meta.min_date;
             state.filterBounds.minDate = meta.min_date;
         }
-        if (endInput && meta.max_date) {
+        if (meta.max_date) {
             endInput.max = meta.max_date;
             endInput.value = meta.max_date;
             state.filters.endDate = meta.max_date;
@@ -791,18 +791,14 @@ async function bootstrap() {
         });
 
         // Date input events
-        if (startInput) {
-            startInput.addEventListener("change", (e) => {
-                state.filters.startDate = e.target.value;
-                switchTab(state.currentTab);
-            });
-        }
-        if (endInput) {
-            endInput.addEventListener("change", (e) => {
-                state.filters.endDate = e.target.value;
-                switchTab(state.currentTab);
-            });
-        }
+        startInput.addEventListener("change", (e) => {
+            state.filters.startDate = e.target.value;
+            switchTab(state.currentTab);
+        });
+        endInput.addEventListener("change", (e) => {
+            state.filters.endDate = e.target.value;
+            switchTab(state.currentTab);
+        });
 
         // Navigation click listeners
         document.querySelectorAll(".nav-item").forEach(btn => {
@@ -850,18 +846,15 @@ async function bootstrap() {
         });
 
         // Refresh button
-        const refreshButton = document.getElementById("btn-refresh");
-        if (refreshButton) {
-            refreshButton.addEventListener("click", async () => {
-                showLoading(true);
-                try {
-                    await fetch("/api/dashboard/refresh", { method: "POST" });
-                    await bootstrap();
-                } finally {
-                    showLoading(false);
-                }
-            });
-        }
+        document.getElementById("btn-refresh").addEventListener("click", async () => {
+            showLoading(true);
+            try {
+                await fetch("/api/dashboard/refresh", { method: "POST" });
+                await bootstrap();
+            } finally {
+                showLoading(false);
+            }
+        });
 
         // Initial tab load
         await loadOverviewTab();
