@@ -235,21 +235,33 @@ function renderPlotly(containerId, figSpec) {
     if (!container) return;
 
     if (!figSpec || !figSpec.data) {
-        container.innerHTML = '<div class="st-alert st-alert-info"><span>ℹ️</span><span>No chart data available.</span></div>';
+        container.innerHTML =
+            '<div class="st-alert st-alert-info"><span>ℹ️</span><span>No chart data available.</span></div>';
         return;
     }
 
-    // Replace any Streamlit placeholder colors before rendering
     const cleanSpec = fixStreamlitColors(figSpec);
+
+    container.style.width = "100%";
+    container.style.height = "420px";
+    container.style.minHeight = "420px";
 
     const layout = {
         ...cleanSpec.layout,
+        height: 420,
+        autosize: true,
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
         font: {
             family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            size: 11,
+            size: 13,
             color: '#475569',
+        },
+        margin: {
+            l: 60,
+            r: 35,
+            t: 65,
+            b: 65,
         },
     };
 

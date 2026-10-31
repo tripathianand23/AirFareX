@@ -12,6 +12,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
 app = FastAPI(title="AirFareX existing-data bridge")
@@ -136,3 +137,614 @@ def dashboard(payload: dict):
     except HTTPException: raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f'Existing AirFareX data operation failed: {exc}')
+
+
+
+# -------------------------------------------------------------------
+# Frontend API compatibility layer
+# Uses existing AirFareX loaders, metrics, observation store and charts.
+# Does not modify frontend files or statistical index calculations.
+# -------------------------------------------------------------------
+
+from fastapi import Query
+from datetime import date
+import math
+
+
+def _api_context():
+    m = _load_modules()
+    daily = m["load_daily_index"]()
+    route_indices = m["load_route_indices"]()
+    lead_indices = m["load_advance_window_indices"]()
+
+    daily = daily.copy() if isinstance(daily, pd.DataFrame) else pd.DataFrame()
+    route_indices = route_indices.copy() if isinstance(route_indices, pd.DataFrame) else pd.DataFrame()
+    lead_indices = lead_indices.copy() if isinstance(lead_indices, pd.DataFrame) else pd.DataFrame()
+
+    return m, daily, route_indices, lead_indices
+
+
+def _api_filters(start_date=None, end_date=None, routes=None,
+                 airlines=None, sources=None):
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "routes": routes or None,
+        "airlines": airlines or None,
+        "sources": sources or None,
+    }
+
+
+def _api_observation_summary(m, filters):
+    return m["query_observations"](
+        page=1,
+        page_size=1,
+        start_date=filters["start_date"],
+        end_date=filters["end_date"],
+        routes=filters["routes"],
+        airlines=filters["airlines"],
+        sources=filters["sources"],
+    )[0]
+
+
+def _api_filter_dates(df, filters):
+    if df is None or df.empty or "collection_date" not in df.columns:
+        return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
+    out = df.copy()
+    dates = pd.to_datetime(out["collection_date"], errors="coerce")
+
+    if filters.get("start_date"):
+        out = out.loc[dates >= pd.Timestamp(filters["start_date"])].copy()
+        dates = pd.to_datetime(out["collection_date"], errors="coerce")
+
+    if filters.get("end_date"):
+        out = out.loc[dates <= pd.Timestamp(filters["end_date"])].copy()
+
+    return out
+
+
+def _api_valid_index(df):
+    if df is None or df.empty or "overall_airfare_index" not in df.columns:
+        return pd.DataFrame()
+
+    out = df.copy()
+    out["overall_airfare_index"] = pd.to_numeric(
+        out["overall_airfare_index"], errors="coerce"
+    )
+    out = out.dropna(subset=["overall_airfare_index"])
+
+    if "index_status" in out.columns:
+        out = out.loc[
+            out["index_status"].astype(str).str.upper().eq("VALID")
+        ]
+
+    return out
+
+
+def _api_quality(m, filters):
+    result = m["data_quality_summary"](**filters)
+    total = int(result.get("total_observations", 0) or 0)
+    missing = float(result.get("missing_fare_pct", 0) or 0)
+    duplicates = float(result.get("duplicate_pct", 0) or 0)
+    score = max(0.0, 100.0 - missing - duplicates)
+
+    return {
+        "total_observations": total,
+        "missing_fare_pct": missing,
+        "duplicate_pct": duplicates,
+        "quality_score": score,
+        "status": "GOOD" if score >= 95 else "REVIEW" if score >= 80 else "POOR",
+    }
+
+
+def _api_json(data):
+    from fastapi.encoders import jsonable_encoder
+    return JSONResponse(content=jsonable_encoder(data))
+
+
+def _api_plot(function, frame):
+    if frame is None or frame.empty:
+        return None
+    return _figure(function(frame))
+
+
+def _api_records(frame, limit=500):
+    return _records(frame, limit=limit)
+
+
+def _api_empty_chart():
+    return None
+
+
+@app.get("/api/dashboard/bootstrap")
+def api_dashboard_bootstrap():
+    m, daily, route_indices, lead_indices = _api_context()
+
+    metadata = m["observation_metadata"]()
+    dimensions = m["observation_dimensions"]()
+
+    valid = _api_valid_index(daily)
+    current = m["latest_index"](daily)
+    latest_date = None
+
+    if not valid.empty:
+        latest_date = str(pd.to_datetime(
+            valid.iloc[-1]["collection_date"], errors="coerce"
+        ).date())
+
+    min_date = metadata.get("min_timestamp")
+    max_date = metadata.get("max_timestamp")
+
+    return _api_json({
+        "headline_index": round(float(current), 2) if pd.notna(current) else None,
+        "latest_date": latest_date,
+        "routes_count": int(metadata.get("routes", 0) or 0),
+        "lead_windows_count": int(
+            lead_indices["advance_days"].nunique()
+            if not lead_indices.empty and "advance_days" in lead_indices.columns
+            else 0
+        ),
+        "min_date": str(pd.to_datetime(min_date).date()) if min_date is not None else None,
+        "max_date": str(pd.to_datetime(max_date).date()) if max_date is not None else None,
+        "routes": dimensions.get("routes", []),
+        "airlines": dimensions.get("airlines", []),
+        "sources": dimensions.get("sources", []),
+    })
+
+
+@app.get("/api/dashboard/overview")
+def api_dashboard_overview(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m, daily, route_indices, lead_indices = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+
+    daily_view = _api_valid_index(_api_filter_dates(daily, filters))
+    route_view = _api_filter_dates(route_indices, filters)
+    lead_view = _api_filter_dates(lead_indices, filters)
+
+    current = m["latest_index"](daily_view)
+    previous = m["previous_index"](daily_view)
+    change = m["index_change_percent"](current, previous)
+
+    total = _api_observation_summary(m, filters)
+    route_summary = m["route_summary"](**filters)
+    source_summary = m["source_summary"](**filters)
+    quality = _api_quality(m, filters)
+
+    overall_chart = _api_plot(m["create_overall_index_chart"], daily_view)
+    route_chart = _api_plot(m["create_route_index_chart"], route_view)
+    lead_chart = _api_plot(m["create_lead_time_chart"], lead_view)
+
+    source_chart = None
+    if not source_summary.empty:
+        import plotly.express as px
+        source_chart = _figure(px.pie(
+            source_summary,
+            names="source",
+            values="observations",
+            title="Observations by Data Source",
+        ))
+
+    # Build a display table from the existing quality summary metrics.
+    # data_quality_summary returns a dictionary, not a DataFrame.
+    quality_table = pd.DataFrame([
+        {"Metric": "Total Observations", "Value": quality["total_observations"]},
+        {"Metric": "Missing Fare (%)", "Value": quality["missing_fare_pct"]},
+        {"Metric": "Duplicate Rate (%)", "Value": quality["duplicate_pct"]},
+        {"Metric": "Quality Score (%)", "Value": quality["quality_score"]},
+        {"Metric": "Status", "Value": quality["status"]},
+    ])
+
+    import plotly.graph_objects as go
+
+    quality_figure = go.Figure(
+        data=[
+            go.Bar(
+                x=["Missing Fare", "Duplicates", "Quality Score"],
+                y=[
+                    quality["missing_fare_pct"],
+                    quality["duplicate_pct"],
+                    quality["quality_score"],
+                ],
+                text=[
+                    f'{quality["missing_fare_pct"]:.2f}%',
+                    f'{quality["duplicate_pct"]:.2f}%',
+                    f'{quality["quality_score"]:.2f}%',
+                ],
+                textposition="auto",
+                marker=dict(color=["#ff6b6b", "#f59e0b", "#16a34a"]),
+            )
+        ]
+    )
+
+    quality_figure.update_layout(
+        title="Data Quality Metrics",
+        yaxis_title="Percentage",
+        yaxis=dict(range=[0, 100]),
+        showlegend=False,
+    )
+
+    quality_chart = _figure(quality_figure)
+    source_table = source_summary
+
+    # The index artifacts remain authoritative; no index is reconstructed
+    # from raw fares in this endpoint.
+    return _api_json({
+        "kpis": {
+            "current_index": round(float(current), 2) if pd.notna(current) else None,
+            "period_change": float(change) if pd.notna(change) else None,
+            "previous_index": round(float(previous), 2) if pd.notna(previous) else None,
+            "total_observations": int(total),
+            "total_routes": int(len(route_summary)),
+            "airline_count": len(filters["airlines"]) if filters["airlines"] else int(m["observation_metadata"]().get("airlines", 0)),
+            "source_count": len(source_summary),
+            "change_7d": None,
+            "change_30d": None,
+        },
+        "overall_chart": overall_chart,
+        "overall_table": _api_records(daily_view),
+        "route_pulse_chart": route_chart,
+        "route_pulse_table": _api_records(route_view),
+        "lead_chart": lead_chart,
+        "lead_table": _api_records(lead_view),
+        "source_chart": source_chart,
+        "quality": {
+            "chart": quality_chart,
+            "table": _api_records(quality_table, 100),
+            "missing_pct": quality["missing_fare_pct"],
+            "duplicate_pct": quality["duplicate_pct"],
+            "score": quality["quality_score"],
+        },
+    })
+
+
+@app.get("/api/dashboard/index-analytics")
+def api_dashboard_index_analytics(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m, daily, _, _ = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    view = _api_valid_index(_api_filter_dates(daily, filters))
+
+    if view.empty:
+        return _api_json({
+            "empty": True, "chart": None, "index_table": [],
+            "weekly_table": [], "monthly_table": [], "audit_trail": [],
+        })
+
+    chart = _api_plot(m["create_overall_index_chart"], view)
+    dates = pd.to_datetime(view["collection_date"], errors="coerce")
+    temp = view.copy()
+    temp["_date"] = dates
+
+    weekly = (
+        temp.set_index("_date")["overall_airfare_index"]
+        .resample("W").mean().dropna().rename("mean_index").reset_index()
+    )
+    monthly = (
+        temp.set_index("_date")["overall_airfare_index"]
+        .resample("ME").mean().dropna().rename("mean_index").reset_index()
+    )
+
+    return _api_json({
+        "empty": False,
+        "chart": chart,
+        "index_table": _api_records(view),
+        "weekly_table": _api_records(weekly),
+        "monthly_table": _api_records(monthly),
+        "audit_trail": [],
+    })
+
+
+@app.get("/api/dashboard/route-intelligence")
+def api_dashboard_route_intelligence(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m, _, route_indices, _ = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    view = _api_filter_dates(route_indices, filters)
+
+    if view.empty:
+        return _api_json({
+            "empty": True,
+            "kpis": {"routes_analysed": 0, "largest_increase": None,
+                     "largest_decrease": None, "median_route_index": None},
+            "route_chart": None, "explorer_routes": [], "ranking_table": [],
+            "heatmap_chart": None, "heatmap_table": [], "coverage_table": [],
+        })
+
+    latest = view.sort_values("collection_date").groupby("route", as_index=False).tail(1)
+    values = pd.to_numeric(latest.get("route_index"), errors="coerce").dropna()
+    ranking = latest.sort_values("route_index", ascending=False)
+
+    return _api_json({
+        "empty": False,
+        "kpis": {
+            "routes_analysed": int(latest["route"].nunique()) if "route" in latest else 0,
+            "largest_increase": None,
+            "largest_decrease": None,
+            "median_route_index": float(values.median()) if not values.empty else None,
+        },
+        "route_chart": _api_plot(m["create_route_index_chart"], view),
+        "explorer_routes": sorted(view["route"].dropna().astype(str).unique().tolist()),
+        "ranking_table": _api_records(ranking),
+        "heatmap_chart": None,
+        "heatmap_table": _api_records(view),
+        "coverage_table": _api_records(m["calculate_route_coverage"](
+            m["load_clean_data"]()
+        )),
+    })
+
+
+@app.get("/api/dashboard/route-explorer")
+def api_dashboard_route_explorer(
+    route: str = "All Routes",
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    _, _, route_indices, _ = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    view = _api_filter_dates(route_indices, filters)
+
+    if route and route != "All Routes" and "route" in view:
+        view = view.loc[view["route"].astype(str) == route]
+
+    return _api_json({"items": _api_records(view), "total": len(view)})
+
+
+@app.get("/api/dashboard/lead-time")
+def api_dashboard_lead_time(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m, _, _, lead_indices = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    view = _api_filter_dates(lead_indices, filters)
+
+    if view.empty:
+        return _api_json({
+            "empty": True, "chart": None, "chart_table": [],
+            "snapshot_table": [], "distribution_table": [],
+            "lead_options": [], "route_options": [],
+        })
+
+    latest = view.sort_values("collection_date").groupby(
+        "advance_days", as_index=False
+    ).tail(1)
+
+    return _api_json({
+        "empty": False,
+        "chart": _api_plot(m["create_lead_time_chart"], view),
+        "chart_table": _api_records(view),
+        "snapshot_table": _api_records(latest),
+        "distribution_table": _api_records(view),
+        "lead_options": sorted(
+            pd.to_numeric(view["advance_days"], errors="coerce").dropna().astype(int).unique().tolist()
+        ),
+        "route_options": [],
+    })
+
+
+@app.get("/api/dashboard/lead-time-explorer")
+def api_dashboard_lead_time_explorer(
+    lead_time: str = "All Lead Times",
+    route: str = "All Routes",
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m, _, _, _ = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    view = m["route_lead_summary"](**filters)
+
+    if lead_time and lead_time != "All Lead Times":
+        try:
+            days = int(str(lead_time).replace("T+", ""))
+            view = view.loc[view["advance_days"] == days]
+        except ValueError:
+            pass
+
+    if route and route != "All Routes":
+        view = view.loc[view["route"].astype(str) == route]
+
+    return _api_json({"items": _api_records(view), "total": len(view)})
+
+
+@app.get("/api/dashboard/data-quality")
+def api_dashboard_data_quality(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m, _, _, _ = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    quality = _api_quality(m, filters)
+
+    # Query only a bounded sample for anomaly review; observations are never deleted.
+    _, sample = m["query_observations"](
+        page=1, page_size=20000, **filters
+    )
+    anomalies = m["detect_fare_anomalies"](sample)
+    flagged = anomalies.loc[anomalies["anomaly_flag"]].copy() if (
+        not anomalies.empty and "anomaly_flag" in anomalies.columns
+    ) else pd.DataFrame()
+
+    return _api_json({
+        "kpis": quality,
+        "anomalies": {
+            "count": len(flagged),
+            "rate": (len(flagged) / len(sample) * 100) if len(sample) else 0.0,
+            "reviewed": len(sample),
+            "flagged": _api_records(flagged, 500),
+        },
+    })
+
+
+@app.get("/api/dashboard/source-health")
+def api_dashboard_source_health(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m, _, _, _ = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    summary = m["source_summary"](**filters)
+    total = int(summary["observations"].sum()) if not summary.empty else 0
+    observed = len(summary)
+    configured = int(m["observation_metadata"]().get("sources", 0) or 0)
+    largest = (
+        float(summary["observations"].max() / total * 100)
+        if total else None
+    )
+
+    metadata = m["observation_metadata"]()
+    earliest = metadata.get("min_timestamp")
+    latest = metadata.get("max_timestamp")
+
+    return _api_json({
+        "empty": summary.empty,
+        "kpis": {
+            "total_observations": total,
+            "observed_sources": observed,
+            "configured_sources": configured,
+            "source_coverage_pct": observed / configured * 100 if configured else 0.0,
+            "largest_source_share": largest,
+            "earliest_date": str(pd.to_datetime(earliest).date()) if earliest is not None else None,
+            "latest_date": str(pd.to_datetime(latest).date()) if latest is not None else None,
+        },
+        "chart": None,
+        "coverage_table": _api_records(summary),
+    })
+
+
+@app.get("/api/observations")
+def api_observations(
+    page: int = 1,
+    page_size: int = 100,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m = _load_modules()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    total, frame = m["query_observations"](
+        page=page,
+        page_size=page_size,
+        **filters,
+    )
+    pages = max(1, math.ceil(total / max(page_size, 1)))
+
+    return _api_json({
+        "total_pages": pages,
+        "total": int(total),
+        "page": max(1, page),
+        "items": _api_records(frame, limit=max(page_size, 1)),
+    })
+
+
+@app.get("/api/dashboard/automation")
+def api_dashboard_automation():
+    m, daily, _, _ = _api_context()
+
+    coverage_path = ROOT / "data" / "processed" / "real" / "index" / "real_coverage_report.csv"
+    audit_candidates = [
+        ROOT / "data" / "reports" / "real" / "real_index_audit.csv",
+        ROOT / "data" / "reports" / "real_index_audit.csv",
+    ]
+    pipeline_path = ROOT / "data" / "reports" / "real_pipeline_report.json"
+
+    coverage = pd.read_csv(coverage_path) if coverage_path.exists() else pd.DataFrame()
+    audit_path = next((p for p in audit_candidates if p.exists()), None)
+    audit = pd.read_csv(audit_path) if audit_path else pd.DataFrame()
+
+    valid = _api_valid_index(daily)
+    latest_audit = _api_records(audit.tail(1), 1)
+    coverage_latest = _api_records(coverage.tail(1), 1)
+
+    status = "UNAVAILABLE"
+    gates = []
+
+    if not coverage.empty:
+        row = coverage.iloc[-1]
+        coverage_status = str(row.get("coverage_status", "UNKNOWN")).upper()
+        passed = coverage_status in ("PASS", "COMPLETE", "VALID")
+        gates.append({
+            "label": "Latest collection coverage",
+            "status": "PASS" if passed else "FAIL",
+        })
+        status = "PUBLISHABLE" if passed and not valid.empty else "HOLD"
+
+    if not valid.empty:
+        gates.append({"label": "Valid published index available", "status": "PASS"})
+    else:
+        gates.append({"label": "Valid published index available", "status": "FAIL"})
+        status = "HOLD"
+
+    pipeline = []
+    if pipeline_path.exists():
+        try:
+            pipeline_data = json.loads(pipeline_path.read_text(encoding="utf-8"))
+            if isinstance(pipeline_data, list):
+                pipeline = pipeline_data
+            elif isinstance(pipeline_data, dict):
+                pipeline = pipeline_data.get("pipeline_stages", [])
+        except Exception:
+            pipeline = []
+
+    return _api_json({
+        "gates": gates,
+        "failed_checks": sum(g["status"] == "FAIL" for g in gates),
+        "warnings": 0 if audit_path else 1,
+        "publication_status": status,
+        "latest_audit": latest_audit[0] if latest_audit else {},
+        "coverage_table": coverage_latest,
+        "pipeline_stages": pipeline,
+        "provenance_table": [],
+        "resilience_policy": [],
+    })
+
+
+@app.post("/api/dashboard/refresh")
+def api_dashboard_refresh():
+    # Existing source functions are queried again on subsequent requests.
+    # No source data, index artifacts, or calculations are changed.
+    return {"ok": True, "message": "Dashboard refresh requested."}
+
+
+# Serve the existing AirFareX HTML frontend
+FRONTEND_DIR = ROOT / "fastapi_migr" / "frontend"
+
+if FRONTEND_DIR.exists():
+    app.mount(
+        "/",
+        StaticFiles(directory=str(FRONTEND_DIR), html=True),
+        name="frontend"
+    )
