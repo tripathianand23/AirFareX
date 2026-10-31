@@ -1065,7 +1065,7 @@ body {
             rgba(10, 50, 77, .34) 55%,
             rgba(6, 31, 52, .48) 100%
         ),
-        url('/airfarex-hero-bg.png') !important;
+        url('/airfarex-aircraft.png') !important;
     background-size: cover !important;
     background-position: center 54% !important;
     background-repeat: no-repeat !important;
