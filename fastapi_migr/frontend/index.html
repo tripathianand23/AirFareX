@@ -9,12 +9,105 @@
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
+    <!-- AirFareX page-load intro transition -->
+    <div id="airfarex-intro" class="airfarex-intro" aria-label="AirFareX loading">
+        <div class="airfarex-intro-copy">
+            <div class="airfarex-intro-brand">AIRFAREX</div>
+            <h1>Airfare Analysis System for MoSPI</h1>
+            <p>Preparing the dashboard experience</p>
+            <div class="airfarex-intro-progress"><span></span></div>
+        </div>
+        <img
+            class="airfarex-intro-aircraft"
+            src="/static/airfarex-aircraft.png"
+            alt="Passenger aircraft flying diagonally upward"
+            fetchpriority="high"
+        >
+    </div>
+
     <div id="loading-badge" class="loading-overlay">
         <div class="spinner"></div>
         <span>Updating data...</span>
     </div>
 
     <div class="app-layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <span>✈️</span>
+                <span>Airfare Index</span>
+            </div>
+            <hr class="sidebar-divider">
+
+            <!-- Date Range -->
+            <div class="sidebar-group">
+                <span class="sidebar-label">Collection date range</span>
+                <div class="date-range-container">
+                    <div class="date-input-wrap">
+                        <span class="date-input-sublabel">Start:</span>
+                        <input type="date" id="filter-start-date" class="sidebar-input">
+                    </div>
+                    <div class="date-input-wrap">
+                        <span class="date-input-sublabel">End:</span>
+                        <input type="date" id="filter-end-date" class="sidebar-input">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Routes Multi-select -->
+            <div class="sidebar-group">
+                <span class="sidebar-label">Routes</span>
+                <div class="multi-select-box" id="routes-multiselect">
+                    <div class="multi-select-toggle" tabindex="0">
+                        <span class="multi-select-placeholder">Choose routes</span>
+                    </div>
+                    <div class="multi-select-dropdown">
+                        <input type="text" class="multi-select-search" placeholder="Search routes...">
+                        <div class="multi-select-options"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Airlines Multi-select -->
+            <div class="sidebar-group">
+                <span class="sidebar-label">Airlines</span>
+                <div class="multi-select-box" id="airlines-multiselect">
+                    <div class="multi-select-toggle" tabindex="0">
+                        <span class="multi-select-placeholder">Choose airlines</span>
+                    </div>
+                    <div class="multi-select-dropdown">
+                        <input type="text" class="multi-select-search" placeholder="Search airlines...">
+                        <div class="multi-select-options"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sources Multi-select -->
+            <div class="sidebar-group">
+                <span class="sidebar-label">Sources</span>
+                <div class="multi-select-box" id="sources-multiselect">
+                    <div class="multi-select-toggle" tabindex="0">
+                        <span class="multi-select-placeholder">Choose sources</span>
+                    </div>
+                    <div class="multi-select-dropdown">
+                        <input type="text" class="multi-select-search" placeholder="Search sources...">
+                        <div class="multi-select-options"></div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="sidebar-divider">
+
+            <div class="sidebar-caption">
+                Filters below affect exploratory views only. They never recalculate the headline index.
+            </div>
+
+            <button id="btn-refresh" class="btn-refresh">
+                <span>🔄</span>
+                <span>Refresh statistical datasets</span>
+            </button>
+        </aside>
+
         <!-- MAIN VIEW -->
         <main class="main-wrapper">
             <div class="block-container">
@@ -474,6 +567,7 @@
         </main>
     </div>
 
+    <script src="/static/js/intro-transition.js"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
