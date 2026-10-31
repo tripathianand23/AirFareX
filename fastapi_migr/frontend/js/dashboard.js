@@ -862,15 +862,18 @@ async function bootstrap() {
         });
 
         // Refresh button
-        document.getElementById("btn-refresh").addEventListener("click", async () => {
-            showLoading(true);
-            try {
-                await fetch("/api/dashboard/refresh", { method: "POST" });
-                await bootstrap();
-            } finally {
-                showLoading(false);
-            }
-        });
+        const refreshButton = document.getElementById("btn-refresh");
+        if (refreshButton) {
+            refreshButton.addEventListener("click", async () => {
+                showLoading(true);
+                try {
+                    await fetch("/api/dashboard/refresh", { method: "POST" });
+                    await bootstrap();
+                } finally {
+                    showLoading(false);
+                }
+            });
+        }
 
         // Initial tab load
         await loadOverviewTab();
