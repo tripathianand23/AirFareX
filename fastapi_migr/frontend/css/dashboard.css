@@ -1105,3 +1105,62 @@ h4.st-heading {
     }
 >>>>>>> e7987fcd401c6b0e0c505211053ef0f10a33f0ea
 }
+
+
+
+/* ==========================================
+   AIRFAREX — REMOVE LEFT FILTER SIDEBAR
+   ========================================== */
+
+/* Hide the left sidebar and filter panel */
+aside,
+#sidebar,
+.sidebar,
+.sidebar-container,
+.filter-sidebar,
+.filters-sidebar,
+.dashboard-sidebar,
+[class*="sidebar"],
+[id*="sidebar"],
+[class*="filter-panel"],
+[id*="filter-panel"] {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+}
+
+/* Expand the dashboard content */
+main,
+.main-content,
+#main-content,
+.dashboard-main,
+.main-area,
+.content-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 20px !important;
+    grid-column: 1 / -1 !important;
+    flex: 1 1 100% !important;
+}
+
+/* Remove empty sidebar column from common layouts */
+.app-layout,
+.dashboard-layout,
+.dashboard-container,
+.app-container {
+    grid-template-columns: minmax(0, 1fr) !important;
+    column-gap: 0 !important;
+}
+
+/* Prevent horizontal overflow */
+html,
+body {
+    overflow-x: hidden;
+}
+
