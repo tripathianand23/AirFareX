@@ -1322,7 +1322,7 @@
     },
     {
       "collection_date": "2026-11-04",
-      "observations": 52778,
+      "observations": 52795,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -1334,8 +1334,8 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 349.3524961159629,
-      "movement_from_base_pct": 3.079178610536971,
+      "national_index": 349.3416438929518,
+      "movement_from_base_pct": 3.075976577500114,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
       "warnings": [
