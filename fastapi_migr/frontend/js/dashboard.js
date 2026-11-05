@@ -21,6 +21,8 @@ const state = {
     rawPageSize: 50,
     rawTotalPages: 1,
     tabDataCache: {},
+    renderedTabKeys: {},
+    loadingTabKeys: {},
 };
 
 // Formal label dictionary matching dashboard/app.py
@@ -131,9 +133,12 @@ function showLoading(show) {
     if (el) el.style.display = show ? "flex" : "none";
 }
 
-// API request wrapper
+// API request wrapper with browser-memory response caching.
+const API_CACHE_TTL_MS = 300000;
+
 async function apiGet(endpoint, params = {}) {
     const url = new URL(endpoint, window.location.origin);
+
     for (const [k, v] of Object.entries(params)) {
         if (Array.isArray(v)) {
             v.forEach(x => url.searchParams.append(k, x));
@@ -141,11 +146,49 @@ async function apiGet(endpoint, params = {}) {
             url.searchParams.set(k, v);
         }
     }
-    const res = await fetch(url.toString());
-    if (!res.ok) {
-        throw new Error(`API call failed: ${res.status} ${res.statusText}`);
+
+    // The complete URL is the cache key, including filters and pagination.
+    const cacheKey = url.toString();
+    const cached = state.tabDataCache[cacheKey];
+
+    if (cached && cached.promise) {
+        return cached.promise;
     }
-    return res.json();
+
+    if (cached && cached.data !== undefined) {
+        if (Date.now() - cached.savedAt < API_CACHE_TTL_MS) {
+            return cached.data;
+        }
+        delete state.tabDataCache[cacheKey];
+    }
+
+    const request = (async () => {
+        const res = await fetch(cacheKey);
+
+        if (!res.ok) {
+            throw new Error(`API call failed: ${res.status} ${res.statusText}`);
+        }
+
+        return res.json();
+    })();
+
+    // Store the in-flight promise too, preventing duplicate simultaneous requests.
+    state.tabDataCache[cacheKey] = {
+        promise: request,
+        savedAt: Date.now()
+    };
+
+    try {
+        const data = await request;
+        state.tabDataCache[cacheKey] = {
+            data,
+            savedAt: Date.now()
+        };
+        return data;
+    } catch (error) {
+        delete state.tabDataCache[cacheKey];
+        throw error;
+    }
 }
 
 function getFilterParams() {
@@ -265,9 +308,18 @@ function renderPlotly(containerId, figSpec) {
         },
     };
 
-    Plotly.newPlot(containerId, cleanSpec.data, layout, {
+    const plotConfig = {
         responsive: true,
         displayModeBar: false,
+    };
+
+    // Reuse an initialized Plotly graph instead of rebuilding it.
+    const renderPromise = container.data
+        ? Plotly.react(container, cleanSpec.data, layout, plotConfig)
+        : Plotly.newPlot(container, cleanSpec.data, layout, plotConfig);
+
+    renderPromise.catch(error => {
+        console.error(`Plotly rendering failed for ${containerId}:`, error);
     });
 }
 
@@ -364,7 +416,9 @@ function setupMultiSelect(containerId, options, onSelectionChange) {
 async function loadOverviewTab() {
     showLoading(true);
     try {
+        const requestFilters = JSON.stringify(getFilterParams());
         const data = await apiGet("/api/dashboard/overview", getFilterParams());
+        if (requestFilters !== JSON.stringify(getFilterParams())) return;
 
         // Headline overview KPIs
         const kpis = data.kpis || {};
@@ -422,7 +476,9 @@ async function loadOverviewTab() {
 async function loadIndexAnalyticsTab() {
     showLoading(true);
     try {
+        const requestFilters = JSON.stringify(getFilterParams());
         const data = await apiGet("/api/dashboard/index-analytics", getFilterParams());
+        if (requestFilters !== JSON.stringify(getFilterParams())) return;
         if (data.empty) {
             document.getElementById("idx-main-chart").innerHTML = '<div class="st-alert st-alert-info"><span>ℹ️</span><span>No index data available.</span></div>';
             return;
@@ -441,7 +497,9 @@ async function loadIndexAnalyticsTab() {
 async function loadRouteIntelligenceTab() {
     showLoading(true);
     try {
+        const requestFilters = JSON.stringify(getFilterParams());
         const data = await apiGet("/api/dashboard/route-intelligence", getFilterParams());
+        if (requestFilters !== JSON.stringify(getFilterParams())) return;
         if (data.empty) {
             document.getElementById("rt-indices-chart").innerHTML = '<div class="st-alert st-alert-info"><span>ℹ️</span><span>No route-level index data available.</span></div>';
             return;
@@ -479,7 +537,13 @@ async function loadRouteIntelligenceTab() {
 async function loadRouteExplorerRecords() {
     const route = document.getElementById("route-explorer-select").value;
     const params = { ...getFilterParams(), route };
+    const requestKey = JSON.stringify(params);
     const res = await apiGet("/api/dashboard/route-explorer", params);
+    const currentKey = JSON.stringify({
+        ...getFilterParams(),
+        route: document.getElementById("route-explorer-select").value
+    });
+    if (requestKey !== currentKey) return;
     renderTable("rt-explorer-table", res.items);
     document.getElementById("rt-explorer-caption").textContent = `Showing ${(res.total || 0).toLocaleString("en-IN")} route-index records. Use the route selector above to inspect a specific route.`;
 }
@@ -487,7 +551,9 @@ async function loadRouteExplorerRecords() {
 async function loadLeadTimeTab() {
     showLoading(true);
     try {
+        const requestFilters = JSON.stringify(getFilterParams());
         const data = await apiGet("/api/dashboard/lead-time", getFilterParams());
+        if (requestFilters !== JSON.stringify(getFilterParams())) return;
         if (data.empty) {
             document.getElementById("lead-main-chart").innerHTML = '<div class="st-alert st-alert-info"><span>ℹ️</span><span>No lead-time contribution data available.</span></div>';
             return;
@@ -521,7 +587,14 @@ async function loadLeadTimeExplorerRecords() {
     const leadTime = document.getElementById("lead-filter-advance").value;
     const route = document.getElementById("lead-filter-route").value;
     const params = { ...getFilterParams(), lead_time: leadTime, route };
+    const requestKey = JSON.stringify(params);
     const res = await apiGet("/api/dashboard/lead-time-explorer", params);
+    const currentKey = JSON.stringify({
+        ...getFilterParams(),
+        lead_time: document.getElementById("lead-filter-advance").value,
+        route: document.getElementById("lead-filter-route").value
+    });
+    if (requestKey !== currentKey) return;
     renderTable("lead-explorer-table", res.items);
     document.getElementById("lead-explorer-caption").textContent = `Showing ${(res.total || 0).toLocaleString("en-IN")} lead-time fare records. Use the filters above to inspect a specific lead-time window or route.`;
 }
@@ -529,7 +602,9 @@ async function loadLeadTimeExplorerRecords() {
 async function loadDataQualityTab() {
     showLoading(true);
     try {
+        const requestFilters = JSON.stringify(getFilterParams());
         const data = await apiGet("/api/dashboard/data-quality", getFilterParams());
+        if (requestFilters !== JSON.stringify(getFilterParams())) return;
 
         const k = data.kpis || {};
         document.getElementById("dq-total-obs").textContent = (k.total_observations || 0).toLocaleString("en-IN");
@@ -559,7 +634,9 @@ async function loadDataQualityTab() {
 async function loadSourceHealthTab() {
     showLoading(true);
     try {
+        const requestFilters = JSON.stringify(getFilterParams());
         const data = await apiGet("/api/dashboard/source-health", getFilterParams());
+        if (requestFilters !== JSON.stringify(getFilterParams())) return;
         if (data.empty) {
             document.getElementById("sh-share-chart").innerHTML = '<div class="st-alert st-alert-info"><span>ℹ️</span><span>No source observations available for the selected filters.</span></div>';
             return;
@@ -600,7 +677,14 @@ async function loadRawExplorerTab() {
             page: state.rawPage,
             page_size: state.rawPageSize,
         };
+        const requestKey = JSON.stringify(params);
         const data = await apiGet("/api/observations", params);
+        const currentKey = JSON.stringify({
+            ...getFilterParams(),
+            page: state.rawPage,
+            page_size: state.rawPageSize
+        });
+        if (requestKey !== currentKey) return;
 
         state.rawTotalPages = Math.max(1, data.total_pages || 1);
 
@@ -709,6 +793,55 @@ async function loadAutomationTab() {
     }
 }
 
+function loadTabData(tabId) {
+    const loaders = {
+        "overview": loadOverviewTab,
+        "index-analytics": loadIndexAnalyticsTab,
+        "route-intelligence": loadRouteIntelligenceTab,
+        "lead-time": loadLeadTimeTab,
+        "data-quality": loadDataQualityTab,
+        "source-health": loadSourceHealthTab,
+        "raw-explorer": loadRawExplorerTab,
+        "automation": loadAutomationTab
+    };
+
+    const loader = loaders[tabId];
+    if (!loader) return Promise.resolve();
+
+    const filterSignature = JSON.stringify(getFilterParams());
+    const renderKey = `${tabId}|${filterSignature}`;
+    const previous = state.renderedTabKeys[tabId];
+
+    if (
+        previous &&
+        previous.key === renderKey &&
+        Date.now() - previous.loadedAt < API_CACHE_TTL_MS
+    ) {
+        return Promise.resolve();
+    }
+
+    if (state.loadingTabKeys[renderKey]) {
+        return state.loadingTabKeys[renderKey];
+    }
+
+    const pending = Promise.resolve()
+        .then(() => loader())
+        .then(() => {
+            if (filterSignature === JSON.stringify(getFilterParams())) {
+                state.renderedTabKeys[tabId] = {
+                    key: renderKey,
+                    loadedAt: Date.now()
+                };
+            }
+        })
+        .finally(() => {
+            delete state.loadingTabKeys[renderKey];
+        });
+
+    state.loadingTabKeys[renderKey] = pending;
+    return pending;
+}
+
 // ---------------------------------------------------------
 // Tab Switching Router
 // ---------------------------------------------------------
@@ -716,43 +849,19 @@ async function loadAutomationTab() {
 function switchTab(tabId) {
     state.currentTab = tabId;
 
-    // Update nav pill classes
+    // Update navigation state.
     document.querySelectorAll(".nav-item").forEach(item => {
         item.classList.toggle("active", item.getAttribute("data-tab") === tabId);
     });
 
-    // Update section visibility
+    // Preserve tab DOM and visibility; only load when filters/data require it.
     document.querySelectorAll(".tab-content").forEach(content => {
         content.classList.toggle("active", content.id === `tab-${tabId}`);
     });
 
-    // Load data for the selected tab
-    switch (tabId) {
-        case "overview":
-            loadOverviewTab();
-            break;
-        case "index-analytics":
-            loadIndexAnalyticsTab();
-            break;
-        case "route-intelligence":
-            loadRouteIntelligenceTab();
-            break;
-        case "lead-time":
-            loadLeadTimeTab();
-            break;
-        case "data-quality":
-            loadDataQualityTab();
-            break;
-        case "source-health":
-            loadSourceHealthTab();
-            break;
-        case "raw-explorer":
-            loadRawExplorerTab();
-            break;
-        case "automation":
-            loadAutomationTab();
-            break;
-    }
+    loadTabData(tabId).catch(err => {
+        console.error(`Failed to load ${tabId}:`, err);
+    });
 }
 
 // ---------------------------------------------------------
@@ -861,22 +970,40 @@ async function bootstrap() {
             }
         });
 
-        // Refresh button
+        // Refresh button: clear browser cache and request backend refresh.
         const refreshButton = document.getElementById("btn-refresh");
         if (refreshButton) {
             refreshButton.addEventListener("click", async () => {
+                refreshButton.disabled = true;
                 showLoading(true);
+
                 try {
-                    await fetch("/api/dashboard/refresh", { method: "POST" });
-                    await bootstrap();
-                } finally {
+                    const response = await fetch("/api/dashboard/refresh", {
+                        method: "POST",
+                        cache: "no-store"
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Refresh failed: ${response.status}`);
+                    }
+
+                    state.tabDataCache = {};
+                    state.renderedTabKeys = {};
+                    state.loadingTabKeys = {};
+
+                    // A clean page load resets all in-memory browser state.
+                    window.location.reload();
+                } catch (err) {
+                    console.error("Dashboard refresh failed:", err);
+                    refreshButton.disabled = false;
                     showLoading(false);
+                    alert("Dashboard refresh failed. Check the browser console.");
                 }
             });
         }
 
         // Initial tab load
-        await loadOverviewTab();
+        await loadTabData(state.currentTab);
 
     } catch (err) {
         console.error("Dashboard initialization failed:", err);
