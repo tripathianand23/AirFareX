@@ -142,7 +142,32 @@ def _connection():
         """
     )
 
+
     return conn
+
+
+def route_coverage_summary():
+    """
+    Calculate route coverage directly in DuckDB.
+    Returns the same route and observations columns as the
+    existing Pandas implementation without loading all rows.
+    """
+    conn = _connection()
+    try:
+        return conn.execute(
+            """
+            SELECT
+                origin || '_' || destination AS route,
+                COUNT(*) AS observations
+            FROM observations
+            WHERE origin IS NOT NULL
+              AND destination IS NOT NULL
+            GROUP BY origin, destination
+            ORDER BY observations DESC
+            """
+        ).fetchdf()
+    finally:
+        conn.close()
 
 
 # ============================================================

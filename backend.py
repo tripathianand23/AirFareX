@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
+from threading import RLock
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,9 +38,10 @@ def _figure(fig: Any) -> dict | None:
         return None
 
 
+@lru_cache(maxsize=1)
 def _load_modules():
     try:
-        from dashboard.observation_store import observation_metadata, observation_dimensions, query_observations, source_summary, route_summary, lead_time_summary, route_lead_summary, data_quality_summary
+        from dashboard.observation_store import observation_metadata, route_coverage_summary, observation_dimensions, query_observations, source_summary, route_summary, lead_time_summary, route_lead_summary, data_quality_summary
         from dashboard.data_loader import load_clean_data, load_raw_observations, load_daily_index, load_route_indices, load_advance_window_indices
         from dashboard.metrics import latest_index, previous_index, index_change_percent, latest_collection_date, observation_count, route_count, airline_count, source_count
         from dashboard.charts import create_overall_index_chart, create_route_index_chart, create_lead_time_chart
@@ -151,17 +154,86 @@ from datetime import date
 import math
 
 
+_API_CONTEXT_LOCK = RLock()
+
+_API_CONTEXT_FILES = [
+    ROOT / "data" / "processed" / "real" / "index" / "real_daily_airfare_index.csv",
+    ROOT / "data" / "processed" / "real" / "index" / "real_route_indices.csv",
+    ROOT / "data" / "processed" / "real" / "index" / "real_lead_time_contributions.csv",
+]
+
+_API_CONTEXT_CACHE = {
+    "signature": None,
+    "frames": None,
+}
+
+_API_COVERAGE_FILES = [
+    ROOT / "data" / "processed" / "real" / "clean_airfare_observations.parquet",
+    Path("/tmp/airfarex/clean_airfare_observations.parquet"),
+]
+
+_API_COVERAGE_CACHE = {
+    "signature": None,
+    "value": None,
+}
+
+
+def _api_file_signature(paths):
+    signature = []
+
+    for path in paths:
+        try:
+            stat = path.stat()
+            signature.append((str(path), stat.st_mtime_ns, stat.st_size))
+        except FileNotFoundError:
+            signature.append((str(path), None, None))
+
+    return tuple(signature)
+
+
 def _api_context():
+    """
+    Reuse the three published index DataFrames in backend memory.
+    Reload automatically when their source CSV files change.
+    """
     m = _load_modules()
-    daily = m["load_daily_index"]()
-    route_indices = m["load_route_indices"]()
-    lead_indices = m["load_advance_window_indices"]()
+    signature = _api_file_signature(_API_CONTEXT_FILES)
 
-    daily = daily.copy() if isinstance(daily, pd.DataFrame) else pd.DataFrame()
-    route_indices = route_indices.copy() if isinstance(route_indices, pd.DataFrame) else pd.DataFrame()
-    lead_indices = lead_indices.copy() if isinstance(lead_indices, pd.DataFrame) else pd.DataFrame()
+    with _API_CONTEXT_LOCK:
+        if signature != _API_CONTEXT_CACHE["signature"]:
+            daily = m["load_daily_index"]()
+            route_indices = m["load_route_indices"]()
+            lead_indices = m["load_advance_window_indices"]()
 
+            _API_CONTEXT_CACHE["frames"] = (
+                daily if isinstance(daily, pd.DataFrame) else pd.DataFrame(),
+                route_indices if isinstance(route_indices, pd.DataFrame) else pd.DataFrame(),
+                lead_indices if isinstance(lead_indices, pd.DataFrame) else pd.DataFrame(),
+            )
+            _API_CONTEXT_CACHE["signature"] = signature
+
+        daily, route_indices, lead_indices = _API_CONTEXT_CACHE["frames"]
+
+    # These shared frames are treated as read-only by API endpoints.
+    # Filtering helpers create their own copies before changing data.
     return m, daily, route_indices, lead_indices
+
+
+def _api_route_coverage(m):
+    """
+    Cache the route-coverage summary instead of loading the clean
+    observation dataset and recomputing coverage on every tab visit.
+    """
+    signature = _api_file_signature(_API_COVERAGE_FILES)
+
+    with _API_CONTEXT_LOCK:
+        if signature != _API_COVERAGE_CACHE["signature"]:
+            coverage = m["route_coverage_summary"]()
+
+            _API_COVERAGE_CACHE["value"] = coverage
+            _API_COVERAGE_CACHE["signature"] = signature
+
+        return _API_COVERAGE_CACHE["value"]
 
 
 def _api_filters(start_date=None, end_date=None, routes=None,
@@ -484,9 +556,7 @@ def api_dashboard_route_intelligence(
         "ranking_table": _api_records(ranking),
         "heatmap_chart": None,
         "heatmap_table": _api_records(view),
-        "coverage_table": _api_records(m["calculate_route_coverage"](
-            m["load_clean_data"]()
-        )),
+        "coverage_table": _api_records(_api_route_coverage(m)),
     })
 
 
@@ -734,9 +804,15 @@ def api_dashboard_automation():
 
 @app.post("/api/dashboard/refresh")
 def api_dashboard_refresh():
-    # Existing source functions are queried again on subsequent requests.
-    # No source data, index artifacts, or calculations are changed.
-    return {"ok": True, "message": "Dashboard refresh requested."}
+    # Explicit refresh invalidates backend memory caches.
+    # Existing source files and statistical calculations are untouched.
+    with _API_CONTEXT_LOCK:
+        _API_CONTEXT_CACHE["signature"] = None
+        _API_CONTEXT_CACHE["frames"] = None
+        _API_COVERAGE_CACHE["signature"] = None
+        _API_COVERAGE_CACHE["value"] = None
+
+    return {"ok": True, "message": "Dashboard memory caches cleared."}
 
 
 # Serve the existing AirFareX HTML frontend
