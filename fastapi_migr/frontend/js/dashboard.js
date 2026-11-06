@@ -285,13 +285,19 @@ function renderPlotly(containerId, figSpec) {
 
     const cleanSpec = fixStreamlitColors(figSpec);
 
+    // Give the route x lead-time heatmap its own readable dimensions.
+    const isRouteLeadHeatmap = containerId === "rt-heatmap-chart";
+    const chartHeight = isRouteLeadHeatmap
+        ? Math.max(560, Number(cleanSpec.layout?.height) || 680)
+        : 420;
+
     container.style.width = "100%";
-    container.style.height = "420px";
-    container.style.minHeight = "420px";
+    container.style.height = `${chartHeight}px`;
+    container.style.minHeight = `${chartHeight}px`;
 
     const layout = {
         ...cleanSpec.layout,
-        height: 420,
+        height: chartHeight,
         autosize: true,
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
@@ -300,12 +306,14 @@ function renderPlotly(containerId, figSpec) {
             size: 13,
             color: '#475569',
         },
-        margin: {
-            l: 60,
-            r: 35,
-            t: 65,
-            b: 65,
-        },
+        margin: isRouteLeadHeatmap
+            ? { l: 105, r: 85, t: 45, b: 85 }
+            : {
+                l: 60,
+                r: 35,
+                t: 65,
+                b: 65,
+            },
     };
 
     const plotConfig = {
@@ -436,7 +444,10 @@ async function loadOverviewTab() {
         document.getElementById("ov-prev-index").textContent = kpis.previous_index != null ? kpis.previous_index.toFixed(2) : "—";
         document.getElementById("ov-total-obs").textContent = (kpis.total_observations || 0).toLocaleString("en-IN");
         document.getElementById("ov-total-routes").textContent = (kpis.total_routes || 0).toLocaleString("en-IN");
-        document.getElementById("ov-airline-count").textContent = (kpis.airline_count || 0).toLocaleString("en-IN");
+        const retentionEl = document.getElementById("ov-retention-rate");
+        retentionEl.textContent = kpis.retention_rate_percent != null
+            ? `${Number(kpis.retention_rate_percent).toFixed(2)}%`
+            : "—";
         document.getElementById("ov-source-count").textContent = (kpis.source_count || 0).toLocaleString("en-IN");
 
         // Movement callout
@@ -599,33 +610,134 @@ async function loadLeadTimeExplorerRecords() {
     document.getElementById("lead-explorer-caption").textContent = `Showing ${(res.total || 0).toLocaleString("en-IN")} lead-time fare records. Use the filters above to inspect a specific lead-time window or route.`;
 }
 
-async function loadDataQualityTab() {
+async function loadDataQualityTab(anomalyDate = null) {
     showLoading(true);
+
     try {
-        const requestFilters = JSON.stringify(getFilterParams());
-        const data = await apiGet("/api/dashboard/data-quality", getFilterParams());
-        if (requestFilters !== JSON.stringify(getFilterParams())) return;
+        const params = {
+            ...getFilterParams(),
+            ...(anomalyDate ? { anomaly_date: anomalyDate } : {})
+        };
+
+        const requestKey = JSON.stringify(params);
+        const data = await apiGet("/api/dashboard/data-quality", params);
+
+        const currentParams = {
+            ...getFilterParams(),
+            ...(anomalyDate ? { anomaly_date: anomalyDate } : {})
+        };
+
+        if (requestKey !== JSON.stringify(currentParams)) return;
 
         const k = data.kpis || {};
-        document.getElementById("dq-total-obs").textContent = (k.total_observations || 0).toLocaleString("en-IN");
-        document.getElementById("dq-missing-fare").textContent = `${(k.missing_fare_pct || 0).toFixed(2)}%`;
-        document.getElementById("dq-dup-rate").textContent = `${(k.duplicate_pct || 0).toFixed(2)}%`;
-        document.getElementById("dq-score").textContent = `${(k.quality_score || 0).toFixed(1)}/100`;
+        const dc = data.data_centre || {};
+        const pipeline = dc.pipeline || {};
+
+        // Existing data-quality KPIs.
+        document.getElementById("dq-total-obs").textContent =
+            (k.total_observations || 0).toLocaleString("en-IN");
+
+        document.getElementById("dq-missing-fare").textContent =
+            `${(k.missing_fare_pct || 0).toFixed(2)}%`;
+
+        document.getElementById("dq-dup-rate").textContent =
+            `${(k.duplicate_pct || 0).toFixed(2)}%`;
+
+        document.getElementById("dq-score").textContent =
+            `${(k.quality_score || 0).toFixed(1)}/100`;
+
         document.getElementById("dq-status").textContent = k.status || "—";
 
+        // Processed observation dataset metrics.
+        document.getElementById("dc-completeness").textContent =
+            k.fare_completeness_pct != null
+                ? `${Number(k.fare_completeness_pct).toFixed(2)}%`
+                : "—";
+
+        document.getElementById("dc-retention").textContent =
+            pipeline.retention_rate_percent != null
+                ? `${Number(pipeline.retention_rate_percent).toFixed(2)}%`
+                : "—";
+
+        document.getElementById("dc-routes").textContent =
+            (dc.route_count || 0).toLocaleString("en-IN");
+
+        document.getElementById("dc-sources").textContent =
+            (dc.source_count || 0).toLocaleString("en-IN");
+
+        document.getElementById("dc-airlines").textContent =
+            (dc.airline_count || 0).toLocaleString("en-IN");
+
+        const formatTimestamp = value =>
+            value ? String(value).replace("T", " ").slice(0, 19) : "—";
+
+        document.getElementById("dc-earliest").textContent =
+            formatTimestamp(dc.earliest_observation);
+
+        document.getElementById("dc-latest").textContent =
+            formatTimestamp(dc.latest_observation);
+
+        // Actual pipeline report counts.
+        const fmt = value =>
+            value != null ? Number(value).toLocaleString("en-IN") : "—";
+
+        document.getElementById("dc-normalized").textContent =
+            fmt(pipeline.normalized_rows);
+
+        document.getElementById("dc-before-dedup").textContent =
+            fmt(pipeline.original_rows);
+
+        document.getElementById("dc-duplicates-removed").textContent =
+            fmt(pipeline.duplicate_rows);
+
+        document.getElementById("dc-after-dedup").textContent =
+            fmt(pipeline.deduplicated_rows);
+
+        document.getElementById("dc-pipeline-status").textContent =
+            pipeline.available
+                ? `Pipeline report available · Final clean rows: ${fmt(pipeline.final_clean_rows)} · Duplicate groups: ${fmt(pipeline.duplicate_groups)}`
+                : "Pipeline report unavailable. Pipeline metrics are not estimated.";
+
+        // Anomaly analysis results.
         const anom = data.anomalies || {};
-        document.getElementById("anom-count").textContent = (anom.count || 0).toLocaleString("en-IN");
-        document.getElementById("anom-rate").textContent = `${(anom.rate || 0).toFixed(2)}%`;
-        document.getElementById("anom-reviewed").textContent = (anom.reviewed || 0).toLocaleString("en-IN");
+
+        document.getElementById("anom-count").textContent =
+            (anom.count || 0).toLocaleString("en-IN");
+
+        document.getElementById("anom-rate").textContent =
+            `${(anom.rate || 0).toFixed(2)}%`;
+
+        document.getElementById("anom-reviewed").textContent =
+            (anom.reviewed || 0).toLocaleString("en-IN");
+
+        const caption = document.getElementById("anom-analysis-caption");
+
+        if (caption) {
+            caption.textContent = anomalyDate
+                ? `Selected date: ${anom.selected_date || anomalyDate} · ${fmt(anom.available_for_date)} matching records · ${fmt(anom.reviewed)} reviewed (maximum 20,000).`
+                : `Latest sample · ${fmt(anom.reviewed)} reviewed (maximum 1,000).`;
+        }
 
         const alertContainer = document.getElementById("anom-alert-container");
+
         if (anom.count === 0) {
-            alertContainer.innerHTML = '<div class="st-alert st-alert-success"><span>✓</span><span>No potential fare anomalies detected.</span></div>';
+            alertContainer.innerHTML =
+                '<div class="st-alert st-alert-success"><span>✓</span><span>No potential fare anomalies detected in the reviewed sample.</span></div>';
         } else {
-            alertContainer.innerHTML = '<div class="st-alert st-alert-warning"><span>⚠️</span><span>Flagged observations are review candidates. Extreme prices are not automatically deleted because they may represent genuine market behaviour.</span></div>';
+            alertContainer.innerHTML =
+                '<div class="st-alert st-alert-warning"><span>⚠️</span><span>Flagged observations are review candidates. Extreme prices are not automatically deleted because they may represent genuine market behaviour.</span></div>';
         }
 
         renderTable("anom-table", anom.flagged);
+
+    } catch (err) {
+        console.error("Data Quality load failed:", err);
+
+        const alertContainer = document.getElementById("anom-alert-container");
+        if (alertContainer) {
+            alertContainer.innerHTML =
+                '<div class="st-alert st-alert-warning"><span>⚠️</span><span>Data Quality could not be loaded. Check the API response and try again.</span></div>';
+        }
     } finally {
         showLoading(false);
     }
@@ -1708,6 +1820,30 @@ async function bootstrap() {
             endInput.addEventListener("change", (e) => {
                 state.filters.endDate = e.target.value;
                 switchTab(state.currentTab);
+            });
+        }
+
+        // Date-specific anomaly analysis runs only after an explicit button click.
+        const anomalyDateInput = document.getElementById("anom-date");
+        const anomalyDateButton = document.getElementById("anom-date-analyse");
+
+        if (anomalyDateInput) {
+            if (meta.min_date) anomalyDateInput.min = meta.min_date;
+
+            if (meta.max_date) {
+                anomalyDateInput.max = meta.max_date;
+                anomalyDateInput.value = meta.max_date;
+            }
+        }
+
+        if (anomalyDateButton && anomalyDateInput) {
+            anomalyDateButton.addEventListener("click", () => {
+                if (!anomalyDateInput.value) {
+                    anomalyDateInput.reportValidity();
+                    return;
+                }
+
+                loadDataQualityTab(anomalyDateInput.value);
             });
         }
 

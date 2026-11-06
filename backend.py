@@ -310,6 +310,38 @@ def _api_quality(m, filters):
     }
 
 
+
+def _api_pipeline_metrics():
+    """Read actual pipeline counts from the existing pipeline report."""
+    report_path = ROOT / "data" / "reports" / "real" / "real_pipeline_report.json"
+
+    try:
+        if not report_path.exists():
+            return {"available": False}
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        if not isinstance(report, dict):
+            return {"available": False}
+
+        dedup = report.get("deduplication", {})
+        if not isinstance(dedup, dict):
+            dedup = {}
+
+        return {
+            "available": True,
+            "raw_input": report.get("raw_input"),
+            "normalized_rows": report.get("normalized_rows"),
+            "original_rows": dedup.get("original_rows"),
+            "duplicate_rows": dedup.get("duplicate_rows"),
+            "deduplicated_rows": dedup.get("deduplicated_rows"),
+            "final_clean_rows": report.get("final_clean_rows"),
+            "retention_rate_percent": dedup.get("retention_rate_percent"),
+            "duplicate_groups": dedup.get("duplicate_groups"),
+        }
+    except (OSError, ValueError, TypeError):
+        return {"available": False}
+
+
 def _api_json(data):
     from fastapi.encoders import jsonable_encoder
     return JSONResponse(content=jsonable_encoder(data))
@@ -454,6 +486,7 @@ def api_dashboard_overview(
             "previous_index": round(float(previous), 2) if pd.notna(previous) else None,
             "total_observations": int(total),
             "total_routes": int(len(route_summary)),
+            "retention_rate_percent": _api_pipeline_metrics().get("retention_rate_percent"),
             "airline_count": len(filters["airlines"]) if filters["airlines"] else int(m["observation_metadata"]().get("airlines", 0)),
             "source_count": len(source_summary),
             "change_7d": None,
@@ -665,6 +698,13 @@ def api_dashboard_route_intelligence(
                     heatmap_data,
                     text_auto=".0f",
                     aspect="auto",
+                    color_continuous_scale=[
+                        "#eff6ff",
+                        "#dbeafe",
+                        "#93c5fd",
+                        "#60a5fa",
+                        "#2563eb",
+                    ],
                     labels={
                         "x": "Advance Days",
                         "y": "Route",
@@ -673,8 +713,40 @@ def api_dashboard_route_intelligence(
                 )
 
                 heatmap_figure.update_layout(
-                    height=max(360, 42 * len(heatmap_data) + 120),
-                    margin=dict(l=10, r=10, t=35, b=10),
+                    height=max(560, 34 * len(heatmap_data) + 180),
+                    margin=dict(l=105, r=85, t=45, b=85),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(
+                        family="Arial, sans-serif",
+                        size=13,
+                        color="#475569",
+                    ),
+                    xaxis=dict(
+                        title="Advance Days",
+                        tickfont=dict(size=12, color="#64748b"),
+                        title_font=dict(size=14, color="#475569"),
+                        automargin=True,
+                    ),
+                    yaxis=dict(
+                        title="Route",
+                        tickfont=dict(size=12, color="#475569"),
+                        title_font=dict(size=14, color="#475569"),
+                        automargin=True,
+                    ),
+                    coloraxis_colorbar=dict(
+                        title=dict(
+                            text="Median Fare (INR)",
+                            font=dict(size=12, color="#475569"),
+                        ),
+                        tickfont=dict(size=11, color="#64748b"),
+                        thickness=16,
+                        len=0.85,
+                    ),
+                )
+
+                heatmap_figure.update_traces(
+                    textfont=dict(size=11, color="#24364b")
                 )
 
                 heatmap_chart = _figure(heatmap_figure)
@@ -1048,26 +1120,80 @@ def api_dashboard_data_quality(
     routes: list[str] | None = Query(None),
     airlines: list[str] | None = Query(None),
     sources: list[str] | None = Query(None),
+    anomaly_date: str | None = None,
 ):
     m, _, _, _ = _api_context()
     filters = _api_filters(start_date, end_date, routes, airlines, sources)
     quality = _api_quality(m, filters)
 
-    # Query only a bounded sample for anomaly review; observations are never deleted.
-    _, sample = m["query_observations"](
-        page=1, page_size=20000, **filters
+    # Initial load reviews only the latest 1,000 observations.
+    # A selected collection date explicitly requests up to 20,000 rows.
+    page_size = 1000
+    anomaly_filters = dict(filters)
+    selected_date = None
+
+    if anomaly_date:
+        parsed_date = pd.to_datetime(anomaly_date, errors="coerce")
+        if pd.isna(parsed_date):
+            raise HTTPException(status_code=400, detail="Invalid anomaly_date. Use YYYY-MM-DD.")
+
+        selected_date = parsed_date.strftime("%Y-%m-%d")
+        anomaly_filters["start_date"] = selected_date
+        anomaly_filters["end_date"] = selected_date
+        page_size = 20000
+
+    # Fetch only columns required by the existing IQR detector and review table.
+    anomaly_columns = [
+        "collection_timestamp",
+        "origin",
+        "destination",
+        "airline",
+        "source",
+        "total_fare",
+    ]
+
+    reviewed_total, sample = m["query_observations"](
+        page=1,
+        page_size=page_size,
+        columns=anomaly_columns,
+        **anomaly_filters,
     )
+
     anomalies = m["detect_fare_anomalies"](sample)
     flagged = anomalies.loc[anomalies["anomaly_flag"]].copy() if (
         not anomalies.empty and "anomaly_flag" in anomalies.columns
     ) else pd.DataFrame()
 
+    metadata = m["observation_metadata"]()
+    pipeline = _api_pipeline_metrics()
+
+    total_observations = int(metadata.get("observations", 0) or 0)
+    latest_timestamp = metadata.get("max_timestamp")
+    earliest_timestamp = metadata.get("min_timestamp")
+
+    missing_pct = float(quality.get("missing_fare_pct", 0) or 0)
+
     return _api_json({
-        "kpis": quality,
+        "kpis": {
+            **quality,
+            "fare_completeness_pct": max(0.0, 100.0 - missing_pct),
+        },
+        "data_centre": {
+            "total_observations": total_observations,
+            "route_count": int(metadata.get("routes", 0) or 0),
+            "airline_count": int(metadata.get("airlines", 0) or 0),
+            "source_count": int(metadata.get("sources", 0) or 0),
+            "earliest_observation": str(earliest_timestamp) if earliest_timestamp else None,
+            "latest_observation": str(latest_timestamp) if latest_timestamp else None,
+            "pipeline": pipeline,
+        },
         "anomalies": {
             "count": len(flagged),
             "rate": (len(flagged) / len(sample) * 100) if len(sample) else 0.0,
             "reviewed": len(sample),
+            "available_for_date": int(reviewed_total),
+            "sample_limit": page_size,
+            "selected_date": selected_date,
             "flagged": _api_records(flagged, 500),
         },
     })
@@ -1323,6 +1449,72 @@ def api_dashboard_automation():
                 "value": f"Unavailable: {exc}",
             }]
 
+    # Resilience policy: report configured behavior, not runtime retry events.
+    try:
+        from src.airfare_ml.data.source_registry import build_default_registry
+        from src.airfare_ml.data.source_config import (
+            build_retry_policy,
+            get_enabled_sources,
+        )
+
+        enabled_sources = get_enabled_sources(build_default_registry())
+        resilience_policy = []
+
+        for config in enabled_sources:
+            policy = build_retry_policy(config)
+            delays = [
+                policy.delay_for_retry(i)
+                for i in range(1, policy.max_retries + 1)
+            ]
+            delay_text = ", ".join(
+                f"{delay:g}s" for delay in delays
+            ) or "none"
+
+            source_label = config.name
+
+            resilience_policy.extend([
+                {
+                    "failure": f"{source_label}: network errors / timeouts",
+                    "class": "Retryable",
+                    "action": (
+                        f"Up to {policy.max_retries} retries "
+                        f"({policy.max_attempts} total attempts)."
+                    ),
+                },
+                {
+                    "failure": f"{source_label}: transient collection errors",
+                    "class": "Retryable",
+                    "action": (
+                        f"Exponential backoff: {delay_text}; "
+                        f"maximum delay {policy.max_delay_seconds:g}s."
+                    ),
+                },
+                {
+                    "failure": f"{source_label}: permanent collection errors",
+                    "class": "Non-retryable",
+                    "action": "Fail immediately; no automatic retry.",
+                },
+                {
+                    "failure": f"{source_label}: ingestion after collection",
+                    "class": "Outside retry scope",
+                    "action": "Ingestion is not retried by retry_call.",
+                },
+            ])
+
+        if not enabled_sources:
+            resilience_policy.append({
+                "failure": "Source registry",
+                "class": "No enabled sources",
+                "action": "No active source retry configuration found.",
+            })
+
+    except Exception as exc:
+        resilience_policy = [{
+            "failure": "Policy configuration",
+            "class": "Unavailable",
+            "action": f"Could not load configured policy: {exc}",
+        }]
+
     return _api_json({
         "gates": gates,
         "failed_checks": sum(g["status"] == "FAIL" for g in gates),
@@ -1332,7 +1524,7 @@ def api_dashboard_automation():
         "coverage_table": coverage_latest,
         "pipeline_stages": pipeline_stages,
         "provenance_table": provenance_table,
-        "resilience_policy": [],
+        "resilience_policy": resilience_policy,
     })
 
 

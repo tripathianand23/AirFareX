@@ -93,8 +93,9 @@
                             <div class="st-metric-value" id="ov-total-routes">—</div>
                         </div>
                         <div class="st-metric">
-                            <div class="st-metric-label">Airline Labels</div>
-                            <div class="st-metric-value" id="ov-airline-count">—</div>
+                            <div class="st-metric-label">Data Retention (%)</div>
+                            <div class="st-metric-value" id="ov-retention-rate">—</div>
+                            <div class="st-caption">Pipeline deduplication retention</div>
                         </div>
                         <div class="st-metric">
                             <div class="st-metric-label">Total Sources</div>
@@ -472,7 +473,94 @@
 
                     <hr class="st-divider">
 
+                    <h3 class="st-subheader">Data Centre — Dataset Health</h3>
+                    <div class="section-note">
+                        Live metrics from the processed observation database. Pipeline figures below are read from the latest recorded pipeline report.
+                    </div>
+
+                    <div class="grid-cols-5">
+                        <div class="st-metric">
+                            <div class="st-metric-label">Fare Completeness</div>
+                            <div class="st-metric-value" id="dc-completeness">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Data Retention</div>
+                            <div class="st-metric-value" id="dc-retention">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Observed Routes</div>
+                            <div class="st-metric-value" id="dc-routes">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Observed Sources</div>
+                            <div class="st-metric-value" id="dc-sources">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Observed Airlines</div>
+                            <div class="st-metric-value" id="dc-airlines">—</div>
+                        </div>
+                    </div>
+
+                    <div class="grid-cols-2">
+                        <div class="st-metric">
+                            <div class="st-metric-label">Earliest Observation</div>
+                            <div class="st-metric-value" id="dc-earliest" style="font-size:1.15rem;">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Latest Observation</div>
+                            <div class="st-metric-value" id="dc-latest" style="font-size:1.15rem;">—</div>
+                        </div>
+                    </div>
+
+                    <h3 class="st-subheader">Pipeline Processing Funnel</h3>
+                    <div class="section-note">
+                        Recorded row counts at each pipeline stage. Retention is the reported deduplication retention rate.
+                    </div>
+
+                    <div class="grid-cols-4">
+                        <div class="st-metric">
+                            <div class="st-metric-label">Normalized Rows</div>
+                            <div class="st-metric-value" id="dc-normalized">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Rows Before Deduplication</div>
+                            <div class="st-metric-value" id="dc-before-dedup">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Duplicates Removed</div>
+                            <div class="st-metric-value" id="dc-duplicates-removed">—</div>
+                        </div>
+                        <div class="st-metric">
+                            <div class="st-metric-label">Rows After Deduplication</div>
+                            <div class="st-metric-value" id="dc-after-dedup">—</div>
+                        </div>
+                    </div>
+
+                    <div class="st-caption" id="dc-pipeline-status">
+                        Pipeline report metrics are unavailable until a valid report is found.
+                    </div>
+
+                    <hr class="st-divider">
+
                     <h3 class="st-subheader">Potential Fare Anomalies</h3>
+
+                    <div class="section-note">
+                        Initial load reviews up to 1,000 latest observations. Date-specific analysis reviews up to 20,000 observations from the selected collection date.
+                    </div>
+
+                    <div style="display:flex; gap:0.75rem; align-items:end; flex-wrap:wrap; margin-bottom:1rem;">
+                        <div>
+                            <label for="anom-date" class="st-metric-label">Observation Collection Date</label>
+                            <input type="date" id="anom-date" style="display:block; padding:0.6rem; border:1px solid #cbd5e1; border-radius:6px; background:#fff; color:#16243a;">
+                        </div>
+                        <button type="button" class="btn-primary" id="anom-date-analyse">
+                            Analyse Selected Date
+                        </button>
+                        <span class="st-caption" id="anom-analysis-caption">
+                            Showing the latest observation sample.
+                        </span>
+                    </div>
+
                     <div class="grid-cols-3" style="margin-bottom: 1rem;">
                         <div class="st-metric">
                             <div class="st-metric-label">Potential Anomalies</div>
@@ -644,6 +732,6 @@
 
     <script src="/js/intro-transition.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="/js/dashboard.js?v=20261106-map-detail-3"></script>
+    <script src="/js/dashboard.js?v=20261107-data-centre-1"></script>
 </body>
 </html>
