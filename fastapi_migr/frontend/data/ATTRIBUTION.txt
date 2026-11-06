@@ -1,0 +1,28 @@
+AIRFAREX INDIA ROUTE MAP — GEOGRAPHIC DATA ATTRIBUTION
+
+Official outer outline:
+Survey of India, International Boundary of India, 1:16 million vector.
+Source: https://surveyofindia.gov.in/
+The SOI-derived outline is used as the India-only outer geography.
+Public redistribution/publication must comply with SOI licence terms.
+
+Approximate Line of Control:
+UN Geospatial boundary data, feature classified as a more-dotted
+boundary line (IND_PAK). Displayed separately and labelled approximate.
+It is not represented as an international boundary.
+
+Internal state and UT boundaries:
+Natural Earth Admin-1, India features, clipped to the SOI outline.
+https://www.naturalearthdata.com/
+
+River centerlines:
+Natural Earth Rivers + Lake Centerlines, clipped to the SOI outline.
+https://www.naturalearthdata.com/
+
+Airport coordinates:
+OurAirports public airport data.
+https://ourairports.com/data/
+
+Route lines:
+Schematic airport-to-airport connections generated from AirFareX
+monitored route records. They are not actual flight trajectories.

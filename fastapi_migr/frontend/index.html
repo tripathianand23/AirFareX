@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AirFareX</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✈️</text></svg>">
-    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/dashboard.css?v=20261106-map-detail-3">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
@@ -26,8 +27,8 @@
         <span>Updating data...</span>
     </div>
 
-    
-    
+
+
 
         <!-- MAIN VIEW -->
         <main class="main-wrapper">
@@ -62,6 +63,7 @@
                     <button class="nav-item active" data-tab="overview">📊 Overview</button>
                     <button class="nav-item" data-tab="index-analytics">📈 Index Analytics</button>
                     <button class="nav-item" data-tab="route-intelligence">🗺 Route Intelligence</button>
+                    <button class="nav-item" data-tab="india-route-map">🇮🇳 India Route Map</button>
                     <button class="nav-item" data-tab="lead-time">⏱ Lead-Time Analysis</button>
                     <button class="nav-item" data-tab="data-quality">🛡 Data Quality</button>
                     <button class="nav-item" data-tab="source-health">📡 Source Health</button>
@@ -230,6 +232,158 @@
 
                     <h3 class="st-subheader">Observed Route Coverage</h3>
                     <div id="rt-coverage-table"></div>
+                </section>
+
+                <!-- INDIA ROUTE MAP -->
+                <section class="tab-content" id="tab-india-route-map">
+                    <div class="afx-map-heading">
+                        <div>
+                            <h3 class="st-subheader">India Route Network</h3>
+                            <p class="section-note">
+                                Official India outline with the monitored domestic airport network.
+                                Select a directional route to inspect its index and observed fare history.
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <div class="afx-map-route-control">
+                            <span class="afx-route-select-kicker">
+                                <span class="afx-route-select-indicator"></span>
+                                START HERE · INTERACTIVE MAP
+                            </span>
+                            <label for="afx-map-route-select">Choose a route to explore</label>
+                            <select id="afx-map-route-select" class="form-select">
+                                <option value="All Routes">All monitored routes</option>
+                            </select>
+                            <small class="afx-route-select-hint">
+                                Select a route to highlight its path, animate the aircraft and explore its statistics.
+                            </small>
+                        </div>
+
+                    <div class="afx-map-summary">
+                        <div class="afx-map-stat">
+                            <span class="afx-map-stat-label">Monitored connections</span>
+                            <strong id="afx-map-route-count">—</strong>
+                        </div>
+                        <div class="afx-map-stat">
+                            <span class="afx-map-stat-label">Indian airports</span>
+                            <strong id="afx-map-airport-count">—</strong>
+                        </div>
+                        <div class="afx-map-stat">
+                            <span class="afx-map-stat-label">Selected connection</span>
+                            <strong id="afx-map-selected-route">All routes</strong>
+                        </div>
+                        <div class="afx-map-stat">
+                            <span class="afx-map-stat-label">Latest route index</span>
+                            <strong id="afx-map-selected-index">—</strong>
+                        </div>
+                    </div>
+
+                    <div class="afx-map-shell">
+                        <div id="afx-india-route-map"
+                             aria-label="Interactive map of India with official outline, approximate Line of Control, monitored airports and curved route connections"></div>
+                    </div>
+
+                    <div class="afx-map-legend">
+                        <span><i class="afx-legend-outline"></i> Survey of India outline</span>
+                        <span><i class="afx-legend-loc"></i> Approximate LoC</span>
+                        <span><i class="afx-legend-line afx-legend-selected"></i> Selected route</span>
+                        <span><i class="afx-legend-line afx-legend-other"></i> Other monitored routes</span>
+                        <span><i class="afx-legend-dot"></i> Monitored airport</span>
+                        <span><i class="afx-legend-river"></i> River</span>
+                        <span><i class="afx-legend-boundary"></i> State / UT boundary</span>
+                    </div>
+
+                    <p class="st-caption afx-map-attribution">
+                        Outer outline: Survey of India. Approximate LoC: UN Geospatial boundary classification,
+                        displayed separately. State and river overlays: Natural Earth, clipped to the SOI outline.
+                        Airport coordinates: OurAirports. Route curves are schematic connections, not actual flight paths.
+                        See <code>/data/ATTRIBUTION.txt</code> for source details and usage conditions.
+                    </p>
+
+                    <section class="afx-route-detail-panel" id="afx-map-route-detail-panel">
+                        <div class="afx-route-detail-heading">
+                            <div>
+                                <span class="afx-route-detail-eyebrow">ROUTE INTELLIGENCE</span>
+                                <h3 id="afx-detail-route-title">Select a monitored route</h3>
+                                <p id="afx-detail-route-subtitle">
+                                    Detailed route statistics will appear here.
+                                </p>
+                            </div>
+                            <span class="afx-route-detail-date" id="afx-detail-collection-date">—</span>
+                        </div>
+
+                        <div class="afx-airport-pair">
+                            <div class="afx-airport-card">
+                                <span class="afx-detail-label">ORIGIN AIRPORT</span>
+                                <strong id="afx-detail-origin-code">—</strong>
+                                <span id="afx-detail-origin-name">—</span>
+                                <small id="afx-detail-origin-coords">—</small>
+                            </div>
+                            <div class="afx-airport-direction" aria-hidden="true">→</div>
+                            <div class="afx-airport-card">
+                                <span class="afx-detail-label">DESTINATION AIRPORT</span>
+                                <strong id="afx-detail-destination-code">—</strong>
+                                <span id="afx-detail-destination-name">—</span>
+                                <small id="afx-detail-destination-coords">—</small>
+                            </div>
+                        </div>
+
+                        <div class="afx-detail-metrics">
+                            <div class="afx-detail-metric">
+                                <span>Latest route index</span>
+                                <strong id="afx-detail-index">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Previous route index</span>
+                                <strong id="afx-detail-previous-index">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Movement</span>
+                                <strong id="afx-detail-movement">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Route ranking</span>
+                                <strong id="afx-detail-rank">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Latest observations</span>
+                                <strong id="afx-detail-observations">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Lead-time strata</span>
+                                <strong id="afx-detail-strata">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Route-link index</span>
+                                <strong id="afx-detail-link-index">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Approx. direct distance</span>
+                                <strong id="afx-detail-distance">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Previous collection date</span>
+                                <strong id="afx-detail-previous-date">—</strong>
+                            </div>
+                            <div class="afx-detail-metric">
+                                <span>Fare-window observations (sum)</span>
+                                <strong id="afx-detail-fare-observations">—</strong>
+                            </div>
+                        </div>
+
+                        <h4 class="st-heading">Historical Route Index</h4>
+                        <div id="afx-map-history-chart" class="chart-container"></div>
+                        <div id="afx-map-history-table"></div>
+
+                        <h4 class="st-heading">Observed Fare by Advance-Purchase Window</h4>
+                        <p class="st-caption">
+                            Median observed fares from the existing observation store.
+                            These are exploratory fare statistics, not a second index calculation.
+                        </p>
+                        <div id="afx-map-fare-table"></div>
+                    </section>
                 </section>
 
                 <!-- TAB 4: LEAD-TIME ANALYSIS -->
@@ -489,6 +643,7 @@
     </div>
 
     <script src="/js/intro-transition.js"></script>
-    <script src="/js/dashboard.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/js/dashboard.js?v=20261106-map-detail-3"></script>
 </body>
 </html>

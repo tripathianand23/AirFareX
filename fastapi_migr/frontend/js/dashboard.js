@@ -98,7 +98,7 @@ function formatRoute(val) {
     if (str.includes("_")) {
         const parts = str.split("_");
         if (parts.length === 2 && parts[0] && parts[1]) {
-            return `${parts[0].toUpperCase()}–${parts[1].toUpperCase()}`;
+            return `${parts[0].toUpperCase()} → ${parts[1].toUpperCase()}`;
         }
     }
     return str;
@@ -793,11 +793,797 @@ async function loadAutomationTab() {
     }
 }
 
+
+// ---------------------------------------------------------
+// India Route Map — official geography, curved routes, aircraft
+// ---------------------------------------------------------
+
+let indiaMapInstance = null;
+let indiaMapRouteLayer = null;
+let indiaMapAirportLookup = {};
+let indiaMapRoutes = [];
+let indiaMapRoutePaths = {};
+let indiaMapAircraftMarker = null;
+let indiaMapAnimationFrame = null;
+let indiaMapDetailRequestId = 0;
+
+function indiaMapSetText(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value == null ? "—" : String(value);
+}
+
+function indiaMapFormatNumber(value, digits = 2) {
+    const number = Number(value);
+    return Number.isFinite(number)
+        ? number.toLocaleString("en-IN", {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits
+        })
+        : "—";
+}
+
+function indiaMapRouteLabel(route) {
+    return `${route.origin} → ${route.destination}`;
+}
+
+function indiaMapDistanceKm(origin, destination) {
+    if (!origin || !destination) return null;
+
+    const rad = degrees => degrees * Math.PI / 180;
+    const dLat = rad(destination.lat - origin.lat);
+    const dLon = rad(destination.lon - origin.lon);
+    const lat1 = rad(origin.lat);
+    const lat2 = rad(destination.lat);
+
+    const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Quadratic Bezier route arcs. Reciprocal directions use opposite offsets.
+function indiaMapBuildArc(origin, destination) {
+    const meanLat = (origin.lat + destination.lat) / 2;
+    const longitudeScale = Math.max(
+        0.25,
+        Math.cos(meanLat * Math.PI / 180)
+    );
+
+    const x1 = origin.lon * longitudeScale;
+    const y1 = origin.lat;
+    const x2 = destination.lon * longitudeScale;
+    const y2 = destination.lat;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.hypot(dx, dy);
+
+    if (!length) {
+        return [[origin.lat, origin.lon], [destination.lat, destination.lon]];
+    }
+
+    const offset = Math.min(1.65, Math.max(0.38, length * 0.105));
+
+    const controlX = (x1 + x2) / 2 + (-dy / length) * offset;
+    const controlY = (y1 + y2) / 2 + (dx / length) * offset;
+
+    const points = [];
+    const samples = 64;
+
+    for (let index = 0; index <= samples; index++) {
+        const t = index / samples;
+        const oneMinus = 1 - t;
+
+        const x = oneMinus * oneMinus * x1
+            + 2 * oneMinus * t * controlX
+            + t * t * x2;
+
+        const y = oneMinus * oneMinus * y1
+            + 2 * oneMinus * t * controlY
+            + t * t * y2;
+
+        points.push([y, x / longitudeScale]);
+    }
+
+    return points;
+}
+
+function indiaMapStopAircraft() {
+    if (indiaMapAnimationFrame !== null) {
+        cancelAnimationFrame(indiaMapAnimationFrame);
+        indiaMapAnimationFrame = null;
+    }
+
+    if (indiaMapAircraftMarker && indiaMapInstance) {
+        indiaMapInstance.removeLayer(indiaMapAircraftMarker);
+    }
+
+    indiaMapAircraftMarker = null;
+}
+
+function indiaMapStartAircraft(route, points) {
+    indiaMapStopAircraft();
+
+    if (!route || !points || points.length < 3 || !indiaMapInstance) return;
+
+    const planeIcon = L.divIcon({
+        className: "afx-plane-marker-wrap",
+        html: '<div class="afx-plane-glyph" aria-label="Animated aircraft">✈</div>',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+    });
+
+    indiaMapAircraftMarker = L.marker(points[0], {
+        pane: "indiaAircraftPane",
+        icon: planeIcon,
+        keyboard: false,
+        interactive: false,
+        zIndexOffset: 1000
+    }).addTo(indiaMapInstance);
+
+    let startTime = null;
+    const duration = 9500;
+
+    const animate = timestamp => {
+        const mapTab = document.getElementById("tab-india-route-map");
+
+        if (!mapTab || !mapTab.classList.contains("active")) {
+            indiaMapAnimationFrame = null;
+            return;
+        }
+
+        if (document.hidden) {
+            indiaMapAnimationFrame = requestAnimationFrame(animate);
+            return;
+        }
+
+        if (startTime === null) startTime = timestamp;
+
+        const progress = ((timestamp - startTime) % duration) / duration;
+        const position = progress * (points.length - 1);
+        const index = Math.floor(position);
+        const fraction = position - index;
+
+        const current = points[index];
+        const next = points[Math.min(index + 1, points.length - 1)];
+        const previous = points[Math.max(0, index - 1)];
+
+        const lat = current[0] + (next[0] - current[0]) * fraction;
+        const lon = current[1] + (next[1] - current[1]) * fraction;
+
+        indiaMapAircraftMarker.setLatLng([lat, lon]);
+
+        const tangentLon = (next[1] - previous[1])
+            * Math.cos(lat * Math.PI / 180);
+        const tangentScreenLat = -(next[0] - previous[0]);
+        const angle = Math.atan2(
+            tangentScreenLat,
+            tangentLon
+        ) * 180 / Math.PI;
+
+        const glyph = indiaMapAircraftMarker.getElement()
+            ?.querySelector(".afx-plane-glyph");
+
+        if (glyph) glyph.style.transform = `rotate(${angle}deg)`;
+
+        indiaMapAnimationFrame = requestAnimationFrame(animate);
+    };
+
+    indiaMapAnimationFrame = requestAnimationFrame(animate);
+}
+
+function indiaMapAirportPopup(airport) {
+    const wrapper = document.createElement("div");
+    const heading = document.createElement("strong");
+    heading.textContent = `${airport.code} — ${airport.city}`;
+    wrapper.appendChild(heading);
+
+    const name = document.createElement("div");
+    name.textContent = airport.name;
+    wrapper.appendChild(name);
+
+    const coordinates = document.createElement("small");
+    coordinates.textContent =
+        `${airport.lat.toFixed(4)}° N, ${airport.lon.toFixed(4)}° E`;
+    wrapper.appendChild(coordinates);
+
+    return wrapper;
+}
+
+function indiaMapAddAirportMarkers(airports) {
+    airports.forEach(airport => {
+        const marker = L.circleMarker(
+            [airport.lat, airport.lon],
+            {
+                pane: "indiaAirportsPane",
+                radius: 6.5,
+                color: "#F0D6AC",
+                weight: 2,
+                fillColor: "#F2E7D5",
+                fillOpacity: 1
+            }
+        );
+
+        marker.bindTooltip(
+            `${airport.code} · ${airport.city}`,
+            {
+                permanent: true,
+                direction: "right",
+                offset: [7, 0],
+                className: "afx-map-airport-label"
+            }
+        );
+
+        marker.bindPopup(indiaMapAirportPopup(airport));
+        marker.addTo(indiaMapInstance);
+    });
+}
+
+function indiaMapSetAirportDetail(prefix, airport) {
+    indiaMapSetText(
+        `afx-detail-${prefix}-code`,
+        airport ? airport.code : "—"
+    );
+    indiaMapSetText(
+        `afx-detail-${prefix}-name`,
+        airport ? `${airport.name} · ${airport.city}` : "—"
+    );
+    indiaMapSetText(
+        `afx-detail-${prefix}-coords`,
+        airport
+            ? `${airport.lat.toFixed(4)}° N, ${airport.lon.toFixed(4)}° E`
+            : "—"
+    );
+}
+
+function indiaMapClearRouteDetail(message) {
+    indiaMapDetailRequestId++;
+
+    indiaMapSetText("afx-detail-route-title", "Select a monitored route");
+    indiaMapSetText("afx-detail-route-subtitle", message);
+    indiaMapSetText("afx-detail-collection-date", "—");
+
+    indiaMapSetAirportDetail("origin", null);
+    indiaMapSetAirportDetail("destination", null);
+
+    [
+        "index", "previous-index", "movement", "rank",
+        "observations", "strata", "link-index", "distance",
+        "previous-date", "fare-observations"
+    ].forEach(key => indiaMapSetText(`afx-detail-${key}`, "—"));
+
+    renderPlotly("afx-map-history-chart", null);
+    renderTable("afx-map-history-table", []);
+    renderTable("afx-map-fare-table", []);
+}
+
+async function indiaMapLoadRouteDetail(route) {
+    const requestId = ++indiaMapDetailRequestId;
+    const label = indiaMapRouteLabel(route);
+
+    indiaMapSetText("afx-detail-route-title", label);
+    indiaMapSetText("afx-detail-route-subtitle", "Loading route statistics and observed fares…");
+    indiaMapSetText("afx-detail-collection-date", "Loading…");
+
+    try {
+        const params = {
+            ...getFilterParams(),
+            route: route.route
+        };
+
+        const data = await apiGet(
+            "/api/dashboard/india-route-map/route-detail",
+            params
+        );
+
+        const select = document.getElementById("afx-map-route-select");
+
+        if (
+            requestId !== indiaMapDetailRequestId
+            || !select
+            || select.value !== route.route
+        ) return;
+
+        if (data.empty) {
+            indiaMapSetText(
+                "afx-detail-route-subtitle",
+                "No route detail records match the current filters."
+            );
+            return;
+        }
+
+        const origin = indiaMapAirportLookup[data.origin];
+        const destination = indiaMapAirportLookup[data.destination];
+
+        indiaMapSetText("afx-detail-route-title", label);
+        indiaMapSetText(
+            "afx-detail-route-subtitle",
+            `${origin?.city || data.origin} → ${destination?.city || data.destination}`
+        );
+        indiaMapSetText("afx-detail-collection-date", data.collection_date);
+        indiaMapSetText(
+            "afx-detail-previous-date",
+            data.previous_collection_date || "—"
+        );
+
+        indiaMapSetAirportDetail("origin", origin);
+        indiaMapSetAirportDetail("destination", destination);
+
+        indiaMapSetText("afx-detail-index", indiaMapFormatNumber(data.route_index));
+        indiaMapSetText(
+            "afx-detail-previous-index",
+            indiaMapFormatNumber(data.previous_route_index)
+        );
+        indiaMapSetText(
+            "afx-detail-movement",
+            data.change_pct == null
+                ? "—"
+                : `${Number(data.change_pct) > 0 ? "+" : ""}${indiaMapFormatNumber(data.change_pct)}%`
+        );
+        indiaMapSetText(
+            "afx-detail-rank",
+            data.route_rank
+                ? `${data.route_rank} of ${data.routes_ranked}`
+                : "—"
+        );
+        indiaMapSetText(
+            "afx-detail-observations",
+            data.observations == null
+                ? "—"
+                : Number(data.observations).toLocaleString("en-IN")
+        );
+        indiaMapSetText("afx-detail-strata", data.lead_time_strata ?? "—");
+        indiaMapSetText(
+            "afx-detail-link-index",
+            indiaMapFormatNumber(data.route_link_index)
+        );
+        indiaMapSetText(
+            "afx-detail-fare-observations",
+            data.fare_observation_total == null
+                ? "—"
+                : Number(data.fare_observation_total).toLocaleString("en-IN")
+        );
+
+        const distance = indiaMapDistanceKm(origin, destination);
+        indiaMapSetText(
+            "afx-detail-distance",
+            distance == null
+                ? "—"
+                : `${Math.round(distance).toLocaleString("en-IN")} km`
+        );
+
+        indiaMapSetText(
+            "afx-detail-route-subtitle",
+            `${origin?.name || data.origin} → ${destination?.name || data.destination}`
+        );
+
+        renderPlotly("afx-map-history-chart", data.history_chart);
+        renderTable(
+            "afx-map-history-table",
+            data.history_table,
+            ["collection_date", "previous_collection_date", "route_index", "route_link_index", "observations", "lead_time_strata"]
+        );
+        renderTable(
+            "afx-map-fare-table",
+            data.fare_table,
+            ["advance_days", "median_fare", "observations"]
+        );
+
+    } catch (error) {
+        if (requestId !== indiaMapDetailRequestId) return;
+        console.error("Selected route detail failed:", error);
+        indiaMapSetText(
+            "afx-detail-route-subtitle",
+            `Route detail unavailable: ${error.message}`
+        );
+    }
+}
+
+function indiaMapRenderRoutes() {
+    if (!indiaMapInstance || !indiaMapRouteLayer) return;
+
+    indiaMapStopAircraft();
+    indiaMapRouteLayer.clearLayers();
+    indiaMapRoutePaths = {};
+
+    const select = document.getElementById("afx-map-route-select");
+    const selected = select ? select.value : "All Routes";
+
+    const drawRoute = (route, isSelected) => {
+        const origin = indiaMapAirportLookup[route.origin];
+        const destination = indiaMapAirportLookup[route.destination];
+
+        if (!origin || !destination) return;
+
+        const points = indiaMapBuildArc(origin, destination);
+        indiaMapRoutePaths[route.route] = points;
+
+        if (isSelected) {
+            L.polyline(points, {
+                pane: "indiaRoutesPane",
+                color: "#F0D6AC",
+                weight: 13,
+                opacity: 0.22,
+                lineCap: "round",
+                lineJoin: "round",
+                interactive: false
+            }).addTo(indiaMapRouteLayer);
+        }
+
+        const hitTarget = L.polyline(points, {
+            pane: "indiaRoutesPane",
+            color: "#FFFFFF",
+            weight: 20,
+            opacity: 0.01,
+            lineCap: "round",
+            interactive: true
+        });
+
+        hitTarget.on("click", () => {
+            if (select) {
+                select.value = route.route;
+                indiaMapRenderRoutes();
+            }
+        });
+
+        hitTarget.addTo(indiaMapRouteLayer);
+
+        const line = L.polyline(points, {
+            pane: "indiaRoutesPane",
+            color: isSelected ? "#F0D6AC" : "#75AFCB",
+            weight: isSelected ? 5.6 : 2.2,
+            opacity: isSelected ? 1 : 0.78,
+            dashArray: isSelected ? null : "6 7",
+            lineCap: "round",
+            lineJoin: "round"
+        });
+
+        line.bindTooltip(indiaMapRouteLabel(route), {
+            sticky: true,
+            className: "afx-map-route-tooltip"
+        });
+
+        const popup = document.createElement("div");
+        const heading = document.createElement("strong");
+        heading.textContent = indiaMapRouteLabel(route);
+        popup.appendChild(heading);
+
+        const details = document.createElement("div");
+        details.textContent =
+            `Route index: ${indiaMapFormatNumber(route.route_index)} · `
+            + `Observations: ${Number(route.observations || 0).toLocaleString("en-IN")}`;
+        popup.appendChild(details);
+
+        line.bindPopup(popup);
+
+        line.on("click", () => {
+            if (select) {
+                select.value = route.route;
+                indiaMapRenderRoutes();
+            }
+        });
+
+        line.addTo(indiaMapRouteLayer);
+    };
+
+    if (selected === "All Routes") {
+        indiaMapRoutes.forEach(route => drawRoute(route, false));
+        indiaMapClearRouteDetail(
+            "Select a route from the map or dropdown to inspect its historical index and observed fare structure."
+        );
+        indiaMapSetText("afx-map-selected-route", "All routes");
+        indiaMapSetText("afx-map-selected-index", "—");
+        indiaMapSetText(
+            "afx-map-detail",
+            "Showing all monitored directional connections. Select a route to highlight its curved path and animate the aircraft."
+        );
+        return;
+    }
+
+    indiaMapRoutes
+        .filter(route => route.route !== selected)
+        .forEach(route => drawRoute(route, false));
+
+    const selectedRoute = indiaMapRoutes.find(
+        route => route.route === selected
+    );
+
+    if (!selectedRoute) {
+        indiaMapClearRouteDetail("The selected route is not available in the current filtered dataset.");
+        return;
+    }
+
+    drawRoute(selectedRoute, true);
+
+    indiaMapSetText(
+        "afx-map-selected-route",
+        indiaMapRouteLabel(selectedRoute)
+    );
+    indiaMapSetText(
+        "afx-map-selected-index",
+        indiaMapFormatNumber(selectedRoute.route_index)
+    );
+
+    const changeText = selectedRoute.change_pct == null
+        ? "Previous observation unavailable"
+        : `Movement: ${Number(selectedRoute.change_pct) > 0 ? "+" : ""}${indiaMapFormatNumber(selectedRoute.change_pct)}%`;
+
+    indiaMapSetText(
+        "afx-map-detail",
+        `${indiaMapRouteLabel(selectedRoute)} · Index: ${indiaMapFormatNumber(selectedRoute.route_index)} · `
+        + `Observations: ${Number(selectedRoute.observations || 0).toLocaleString("en-IN")} · `
+        + `Collection date: ${selectedRoute.collection_date} · ${changeText}`
+    );
+
+    indiaMapStartAircraft(
+        selectedRoute,
+        indiaMapRoutePaths[selectedRoute.route]
+    );
+
+    indiaMapLoadRouteDetail(selectedRoute);
+}
+
+async function loadIndiaRouteMapTab() {
+    showLoading(true);
+
+    try {
+        if (!window.L) {
+            throw new Error("Leaflet could not be loaded. Check the Leaflet CDN connection.");
+        }
+
+        const requestSignature = JSON.stringify(getFilterParams());
+
+        const [
+            routeData,
+            outlineResponse,
+            stateResponse,
+            riverResponse,
+            locResponse,
+            airportResponse
+        ] = await Promise.all([
+            apiGet("/api/dashboard/india-route-map", getFilterParams()),
+            fetch("/data/india-soi-outline.geojson"),
+            fetch("/data/india-states.geojson"),
+            fetch("/data/india-rivers.geojson"),
+            fetch("/data/india-loc-approx.geojson"),
+            fetch("/data/india-airports.json")
+        ]);
+
+        const responses = [
+            outlineResponse,
+            stateResponse,
+            riverResponse,
+            locResponse,
+            airportResponse
+        ];
+
+        for (const response of responses) {
+            if (!response.ok) {
+                throw new Error(`Geographic asset failed: HTTP ${response.status}`);
+            }
+        }
+
+        const [
+            outline,
+            states,
+            rivers,
+            loc,
+            airports
+        ] = await Promise.all([
+            outlineResponse.json(),
+            stateResponse.json(),
+            riverResponse.json(),
+            locResponse.json(),
+            airportResponse.json()
+        ]);
+
+        if (requestSignature !== JSON.stringify(getFilterParams())) return;
+
+        if (routeData.empty || !routeData.routes?.length) {
+            indiaMapSetText("afx-map-route-count", "0");
+            indiaMapSetText(
+                "afx-map-detail",
+                "No monitored routes match the current dashboard filters."
+            );
+            indiaMapClearRouteDetail("No route records match the current filters.");
+            return;
+        }
+
+        indiaMapRoutes = routeData.routes;
+        indiaMapAirportLookup = Object.fromEntries(
+            airports.map(airport => [airport.code, airport])
+        );
+
+        const select = document.getElementById("afx-map-route-select");
+        if (!select) return;
+
+        const previousSelection = select.value || "All Routes";
+        select.replaceChildren();
+
+        const allOption = document.createElement("option");
+        allOption.value = "All Routes";
+        allOption.textContent = "All monitored routes";
+        select.appendChild(allOption);
+
+        indiaMapRoutes.forEach(route => {
+            const option = document.createElement("option");
+            option.value = route.route;
+            option.textContent = indiaMapRouteLabel(route);
+            select.appendChild(option);
+        });
+
+        select.value = indiaMapRoutes.some(
+            route => route.route === previousSelection
+        ) ? previousSelection : "All Routes";
+
+        if (!select.dataset.mapBound) {
+            select.addEventListener("change", indiaMapRenderRoutes);
+            select.dataset.mapBound = "true";
+        }
+
+        indiaMapSetText("afx-map-route-count", indiaMapRoutes.length);
+        indiaMapSetText("afx-map-airport-count", airports.length);
+
+        const mapElement = document.getElementById("afx-india-route-map");
+        if (!mapElement) return;
+
+        if (!indiaMapInstance) {
+            indiaMapInstance = L.map(mapElement, {
+                zoomControl: true,
+                scrollWheelZoom: false,
+                preferCanvas: true,
+                minZoom: 3,
+                maxZoom: 8,
+                maxBounds: [[4.5, 65], [39.5, 100]],
+                maxBoundsViscosity: 0.88,
+                attributionControl: true
+            });
+
+            indiaMapInstance.createPane("indiaOutlinePane");
+            indiaMapInstance.getPane("indiaOutlinePane").style.zIndex = 380;
+
+            indiaMapInstance.createPane("indiaStatesPane");
+            indiaMapInstance.getPane("indiaStatesPane").style.zIndex = 390;
+
+            indiaMapInstance.createPane("indiaRiversPane");
+            indiaMapInstance.getPane("indiaRiversPane").style.zIndex = 400;
+
+            indiaMapInstance.createPane("indiaLocPane");
+            indiaMapInstance.getPane("indiaLocPane").style.zIndex = 410;
+
+            indiaMapInstance.createPane("indiaRoutesPane");
+            indiaMapInstance.getPane("indiaRoutesPane").style.zIndex = 420;
+
+            indiaMapInstance.createPane("indiaAirportsPane");
+            indiaMapInstance.getPane("indiaAirportsPane").style.zIndex = 430;
+
+            indiaMapInstance.createPane("indiaAircraftPane");
+            indiaMapInstance.getPane("indiaAircraftPane").style.zIndex = 650;
+
+            const outlineLayer = L.geoJSON(outline, {
+                pane: "indiaOutlinePane",
+                style: {
+                    color: "#E4D6C3",
+                    weight: 2.1,
+                    opacity: 1,
+                    fillColor: "#263440",
+                    fillOpacity: 0.98,
+                    lineJoin: "round"
+                }
+            }).addTo(indiaMapInstance);
+
+            L.geoJSON(states, {
+                pane: "indiaStatesPane",
+                style: {
+                    color: "#C9BBA8",
+                    weight: 0.8,
+                    opacity: 0.82,
+                    fillOpacity: 0,
+                    lineJoin: "round"
+                },
+                onEachFeature: (feature, layer) => {
+                    const name = feature.properties.name_en
+                        || feature.properties.name
+                        || "Indian administrative area";
+
+                    layer.bindTooltip(name, {
+                        sticky: true,
+                        className: "afx-map-state-tooltip"
+                    });
+                }
+            }).addTo(indiaMapInstance);
+
+            L.geoJSON(rivers, {
+                pane: "indiaRiversPane",
+                style: {
+                    color: "#8295A0",
+                    weight: 1.1,
+                    opacity: 0.9
+                },
+                onEachFeature: (feature, layer) => {
+                    const name = feature.properties.name_en
+                        || feature.properties.name;
+
+                    if (name) {
+                        layer.bindTooltip(name, {
+                            sticky: true,
+                            className: "afx-map-river-tooltip"
+                        });
+                    }
+                }
+            }).addTo(indiaMapInstance);
+
+            L.geoJSON(loc, {
+                pane: "indiaLocPane",
+                style: {
+                    color: "#D69B70",
+                    weight: 2.3,
+                    opacity: 0.96,
+                    dashArray: "2 7",
+                    lineCap: "round"
+                },
+                onEachFeature: (feature, layer) => {
+                    layer.bindTooltip(
+                        "Approximate Line of Control · UN Geospatial classification",
+                        {
+                            sticky: true,
+                            className: "afx-map-loc-tooltip"
+                        }
+                    );
+                    layer.bindPopup(
+                        "Approximate Line of Control. This is a separately classified approximate line, not an international boundary."
+                    );
+                }
+            }).addTo(indiaMapInstance);
+
+            indiaMapRouteLayer = L.layerGroup().addTo(indiaMapInstance);
+            indiaMapAddAirportMarkers(airports);
+
+            const bounds = outlineLayer.getBounds();
+            if (bounds.isValid()) {
+                indiaMapInstance.fitBounds(bounds, {
+                    padding: [6, 6],
+                    maxZoom: 5.0
+                });
+
+                indiaMapInstance.setZoom(
+                    Math.min(6, indiaMapInstance.getZoom() + 1),
+                    { animate: false }
+                );
+            } else {
+                indiaMapInstance.setView([22.5, 82], 4);
+            }
+        }
+
+        indiaMapRenderRoutes();
+
+        requestAnimationFrame(() => {
+            if (indiaMapInstance) {
+                indiaMapInstance.invalidateSize();
+            }
+        });
+
+    } catch (error) {
+        console.error("India Route Map failed:", error);
+        indiaMapSetText(
+            "afx-map-detail",
+            `Map unavailable: ${error.message}`
+        );
+        indiaMapSetText(
+            "afx-detail-route-subtitle",
+            `Map unavailable: ${error.message}`
+        );
+    } finally {
+        showLoading(false);
+    }
+}
+
 function loadTabData(tabId) {
     const loaders = {
         "overview": loadOverviewTab,
         "index-analytics": loadIndexAnalyticsTab,
         "route-intelligence": loadRouteIntelligenceTab,
+        "india-route-map": loadIndiaRouteMapTab,
         "lead-time": loadLeadTimeTab,
         "data-quality": loadDataQualityTab,
         "source-health": loadSourceHealthTab,

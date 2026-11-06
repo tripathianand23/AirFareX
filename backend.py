@@ -514,7 +514,31 @@ def api_dashboard_index_analytics(
         "index_table": _api_records(view),
         "weekly_table": _api_records(weekly),
         "monthly_table": _api_records(monthly),
-        "audit_trail": [],
+        "audit_trail": (
+            _api_records(
+                (
+                    lambda audit: audit.loc[
+                        (
+                            pd.to_datetime(audit["collection_date"], errors="coerce")
+                            >= pd.Timestamp(filters["start_date"])
+                            if filters.get("start_date") else pd.Series(True, index=audit.index)
+                        )
+                        & (
+                            pd.to_datetime(audit["collection_date"], errors="coerce")
+                            <= pd.Timestamp(filters["end_date"])
+                            if filters.get("end_date") else pd.Series(True, index=audit.index)
+                        )
+                    ].sort_values("collection_date", ascending=False).head(100)
+                )(
+                    pd.read_csv(
+                        ROOT / "data" / "reports" / "real" / "real_index_audit.csv"
+                    )
+                ),
+                100,
+            )
+            if (ROOT / "data" / "reports" / "real" / "real_index_audit.csv").exists()
+            else []
+        ),
     })
 
 
@@ -533,30 +557,405 @@ def api_dashboard_route_intelligence(
     if view.empty:
         return _api_json({
             "empty": True,
-            "kpis": {"routes_analysed": 0, "largest_increase": None,
-                     "largest_decrease": None, "median_route_index": None},
-            "route_chart": None, "explorer_routes": [], "ranking_table": [],
-            "heatmap_chart": None, "heatmap_table": [], "coverage_table": [],
+            "kpis": {
+                "routes_analysed": 0,
+                "largest_increase": None,
+                "largest_decrease": None,
+                "median_route_index": None,
+            },
+            "route_chart": None,
+            "explorer_routes": [],
+            "ranking_table": [],
+            "heatmap_chart": None,
+            "heatmap_table": [],
+            "coverage_table": [],
         })
 
-    latest = view.sort_values("collection_date").groupby("route", as_index=False).tail(1)
-    values = pd.to_numeric(latest.get("route_index"), errors="coerce").dropna()
+    ordered = view.copy()
+    ordered["_date_sort"] = pd.to_datetime(
+        ordered["collection_date"], errors="coerce"
+    )
+    ordered["route_index"] = pd.to_numeric(
+        ordered["route_index"], errors="coerce"
+    )
+    ordered = ordered.dropna(
+        subset=["route", "_date_sort", "route_index"]
+    )
+
+    latest = (
+        ordered.sort_values(["route", "_date_sort"])
+        .groupby("route", as_index=False)
+        .tail(1)
+    )
+    values = pd.to_numeric(
+        latest["route_index"], errors="coerce"
+    ).dropna()
     ranking = latest.sort_values("route_index", ascending=False)
+
+    movers = []
+    for route, group in ordered.groupby("route"):
+        history = group.sort_values("_date_sort")
+        if len(history) < 2:
+            continue
+
+        previous_value = float(history["route_index"].iloc[-2])
+        latest_value = float(history["route_index"].iloc[-1])
+
+        if previous_value == 0:
+            continue
+
+        change_pct = (
+            (latest_value - previous_value) / abs(previous_value)
+        ) * 100
+
+        movers.append((str(route), change_pct))
+
+    increase = max(movers, key=lambda item: item[1]) if movers else None
+    decrease = min(movers, key=lambda item: item[1]) if movers else None
+
+    largest_increase = (
+        f"{increase[0].replace(chr(95), chr(32) + chr(8594) + chr(32))} ({increase[1]:+.2f}%)" if increase else None
+    )
+    largest_decrease = (
+        f"{decrease[0].replace(chr(95), chr(32) + chr(8594) + chr(32))} ({decrease[1]:+.2f}%)" if decrease else None
+    )
+
+    heatmap_chart = None
+    heatmap_table = []
+
+    route_lead = m["route_lead_summary"](**filters)
+
+    if not route_lead.empty:
+        heatmap_source = route_lead.copy()
+        heatmap_source["advance_days"] = pd.to_numeric(
+            heatmap_source["advance_days"], errors="coerce"
+        )
+        heatmap_source["median_fare"] = pd.to_numeric(
+            heatmap_source["median_fare"], errors="coerce"
+        )
+        heatmap_source = heatmap_source.dropna(
+            subset=["route", "advance_days", "median_fare"]
+        )
+
+        if not heatmap_source.empty:
+            heatmap_source["advance_days"] = (
+                heatmap_source["advance_days"].astype(int)
+            )
+
+            heatmap_data = (
+                heatmap_source.pivot(
+                    index="route",
+                    columns="advance_days",
+                    values="median_fare",
+                )
+                .sort_index()
+            )
+
+            lead_columns = [
+                day for day in [1, 7, 15, 30, 45]
+                if day in heatmap_data.columns
+            ]
+
+            if lead_columns:
+                heatmap_data = heatmap_data.reindex(columns=lead_columns)
+
+                import plotly.express as px
+
+                heatmap_figure = px.imshow(
+                    heatmap_data,
+                    text_auto=".0f",
+                    aspect="auto",
+                    labels={
+                        "x": "Advance Days",
+                        "y": "Route",
+                        "color": "Median Fare (INR)",
+                    },
+                )
+
+                heatmap_figure.update_layout(
+                    height=max(360, 42 * len(heatmap_data) + 120),
+                    margin=dict(l=10, r=10, t=35, b=10),
+                )
+
+                heatmap_chart = _figure(heatmap_figure)
+                heatmap_table = _api_records(
+                    heatmap_data.reset_index()
+                )
 
     return _api_json({
         "empty": False,
         "kpis": {
-            "routes_analysed": int(latest["route"].nunique()) if "route" in latest else 0,
-            "largest_increase": None,
-            "largest_decrease": None,
-            "median_route_index": float(values.median()) if not values.empty else None,
+            "routes_analysed": int(latest["route"].nunique()),
+            "largest_increase": largest_increase,
+            "largest_decrease": largest_decrease,
+            "median_route_index": (
+                float(values.median()) if not values.empty else None
+            ),
         },
         "route_chart": _api_plot(m["create_route_index_chart"], view),
-        "explorer_routes": sorted(view["route"].dropna().astype(str).unique().tolist()),
+        "explorer_routes": sorted(
+            view["route"].dropna().astype(str).unique().tolist()
+        ),
         "ranking_table": _api_records(ranking),
-        "heatmap_chart": None,
-        "heatmap_table": _api_records(view),
+        "heatmap_chart": heatmap_chart,
+        "heatmap_table": heatmap_table,
         "coverage_table": _api_records(_api_route_coverage(m)),
+    })
+
+
+@app.get("/api/dashboard/india-route-map")
+def api_dashboard_india_route_map(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    _, _, route_indices, _ = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+    view = _api_filter_dates(route_indices, filters)
+
+    if filters.get("routes") and "route" in view.columns:
+        view = view.loc[
+            view["route"].astype(str).isin(filters["routes"])
+        ]
+
+    if view.empty or not {"route", "route_index", "collection_date"}.issubset(view.columns):
+        return _api_json({"empty": True, "routes": []})
+
+    work = view.copy()
+    work["_date_sort"] = pd.to_datetime(
+        work["collection_date"], errors="coerce"
+    )
+    work["route_index"] = pd.to_numeric(
+        work["route_index"], errors="coerce"
+    )
+    work = work.dropna(
+        subset=["route", "_date_sort", "route_index"]
+    )
+
+    route_records = []
+
+    for route, group in work.groupby("route"):
+        route_id = str(route)
+        parts = route_id.split("_")
+
+        if len(parts) != 2:
+            continue
+
+        history = group.sort_values("_date_sort")
+        latest = history.iloc[-1]
+        previous_value = (
+            float(history.iloc[-2]["route_index"])
+            if len(history) >= 2 else None
+        )
+        latest_value = float(latest["route_index"])
+
+        change_pct = None
+        if previous_value not in (None, 0):
+            change_pct = (
+                (latest_value - previous_value)
+                / abs(previous_value)
+            ) * 100
+
+        observation_count = latest.get("observations")
+        observation_count = (
+            int(observation_count)
+            if pd.notna(observation_count) else None
+        )
+
+        route_records.append({
+            "route": route_id,
+            "origin": parts[0],
+            "destination": parts[1],
+            "route_index": latest_value,
+            "collection_date": str(latest["_date_sort"].date()),
+            "observations": observation_count,
+            "change_pct": change_pct,
+        })
+
+    route_records.sort(key=lambda item: item["route"])
+
+    return _api_json({
+        "empty": not route_records,
+        "routes": route_records,
+        "route_count": len(route_records),
+    })
+
+
+@app.get("/api/dashboard/india-route-map/route-detail")
+def api_dashboard_india_route_detail(
+    route: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    routes: list[str] | None = Query(None),
+    airlines: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+):
+    m, _, route_indices, _ = _api_context()
+    filters = _api_filters(start_date, end_date, routes, airlines, sources)
+
+    if filters.get("routes") and route not in filters["routes"]:
+        return _api_json({"empty": True, "route": route})
+
+    view = _api_filter_dates(route_indices, filters)
+
+    if view.empty or "route" not in view.columns:
+        return _api_json({"empty": True, "route": route})
+
+    history = view.loc[
+        view["route"].astype(str) == route
+    ].copy()
+
+    if history.empty:
+        return _api_json({"empty": True, "route": route})
+
+    history["_date_sort"] = pd.to_datetime(
+        history["collection_date"], errors="coerce"
+    )
+    history["route_index"] = pd.to_numeric(
+        history["route_index"], errors="coerce"
+    )
+    history = history.dropna(
+        subset=["_date_sort", "route_index"]
+    ).sort_values("_date_sort")
+
+    if history.empty:
+        return _api_json({"empty": True, "route": route})
+
+    latest = history.iloc[-1]
+    previous = history.iloc[-2] if len(history) >= 2 else None
+
+    latest_index = float(latest["route_index"])
+    previous_index = (
+        float(previous["route_index"]) if previous is not None else None
+    )
+
+    change_pct = None
+    if previous_index not in (None, 0):
+        change_pct = (
+            (latest_index - previous_index) / abs(previous_index)
+        ) * 100
+
+    all_latest = (
+        view.assign(
+            _date_sort=pd.to_datetime(
+                view["collection_date"], errors="coerce"
+            ),
+            _index=pd.to_numeric(view["route_index"], errors="coerce"),
+        )
+        .dropna(subset=["_date_sort", "_index"])
+        .sort_values(["route", "_date_sort"])
+        .groupby("route", as_index=False)
+        .tail(1)
+        .sort_values("_index", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    rank_matches = all_latest.index[
+        all_latest["route"].astype(str) == route
+    ].tolist()
+    route_rank = rank_matches[0] + 1 if rank_matches else None
+
+    lead_summary = m["route_lead_summary"](**filters)
+    fare_route = route.replace("_", "-").upper()
+
+    if not lead_summary.empty and "route" in lead_summary.columns:
+        fare_summary = lead_summary.loc[
+            lead_summary["route"].astype(str).str.upper() == fare_route
+        ].copy()
+    else:
+        fare_summary = pd.DataFrame()
+
+    fare_columns = [
+        column for column in [
+            "advance_days", "median_fare", "observations"
+        ]
+        if column in fare_summary.columns
+    ]
+
+    if not fare_summary.empty:
+        fare_summary = fare_summary[fare_columns].copy()
+        fare_summary["advance_days"] = pd.to_numeric(
+            fare_summary["advance_days"], errors="coerce"
+        )
+        fare_summary = fare_summary.dropna(
+            subset=["advance_days"]
+        ).sort_values("advance_days")
+
+    fare_observation_total = int(
+        pd.to_numeric(
+            fare_summary.get("observations", pd.Series(dtype=float)),
+            errors="coerce",
+        ).fillna(0).sum()
+    )
+
+    history_columns = [
+        column for column in [
+            "collection_date",
+            "previous_collection_date",
+            "route_index",
+            "route_link_index",
+            "observations",
+            "lead_time_strata",
+        ]
+        if column in history.columns
+    ]
+    history_table = history[history_columns].copy()
+
+    history_chart = None
+    if not history_table.empty:
+        import plotly.express as px
+
+        figure = px.line(
+            history_table,
+            x="collection_date",
+            y="route_index",
+            markers=True,
+            title=f"{route.replace('_', ' → ')} — Route Index History",
+            labels={
+                "collection_date": "Collection Date",
+                "route_index": "Route Index",
+            },
+        )
+        history_chart = _figure(figure)
+
+    lead_strata = latest.get("lead_time_strata")
+    lead_strata = (
+        int(lead_strata) if pd.notna(lead_strata) else None
+    )
+
+    latest_observations = latest.get("observations")
+    latest_observations = (
+        int(latest_observations)
+        if pd.notna(latest_observations) else None
+    )
+
+    return _api_json({
+        "empty": False,
+        "route": route,
+        "origin": route.split("_", 1)[0],
+        "destination": route.split("_", 1)[1],
+        "collection_date": str(latest["_date_sort"].date()),
+        "route_index": latest_index,
+        "route_link_index": (
+            float(latest["route_link_index"])
+            if pd.notna(latest.get("route_link_index")) else None
+        ),
+        "previous_route_index": previous_index,
+        "previous_collection_date": (
+            str(pd.to_datetime(previous["collection_date"]).date())
+            if previous is not None else None
+        ),
+        "change_pct": change_pct,
+        "route_rank": route_rank,
+        "routes_ranked": int(len(all_latest)),
+        "observations": latest_observations,
+        "lead_time_strata": lead_strata,
+        "fare_observation_total": fare_observation_total,
+        "history_chart": history_chart,
+        "history_table": _api_records(history_table, 100),
+        "fare_table": _api_records(fare_summary, 20),
     })
 
 
@@ -708,7 +1107,18 @@ def api_dashboard_source_health(
             "earliest_date": str(pd.to_datetime(earliest).date()) if earliest is not None else None,
             "latest_date": str(pd.to_datetime(latest).date()) if latest is not None else None,
         },
-        "chart": None,
+        "chart": (
+            _figure(
+                __import__("plotly.express", fromlist=["pie"]).pie(
+                    summary,
+                    names="source",
+                    values="observations",
+                    hole=0.58,
+                    title="Observations by Data Source",
+                )
+            )
+            if not summary.empty else None
+        ),
         "coverage_table": _api_records(summary),
     })
 
@@ -749,7 +1159,7 @@ def api_dashboard_automation():
         ROOT / "data" / "reports" / "real" / "real_index_audit.csv",
         ROOT / "data" / "reports" / "real_index_audit.csv",
     ]
-    pipeline_path = ROOT / "data" / "reports" / "real_pipeline_report.json"
+    pipeline_path = ROOT / "data" / "reports" / "real" / "real_pipeline_report.json"
 
     coverage = pd.read_csv(coverage_path) if coverage_path.exists() else pd.DataFrame()
     audit_path = next((p for p in audit_candidates if p.exists()), None)
@@ -778,16 +1188,140 @@ def api_dashboard_automation():
         gates.append({"label": "Valid published index available", "status": "FAIL"})
         status = "HOLD"
 
-    pipeline = []
+    pipeline_stages = []
+    provenance_table = []
+
     if pipeline_path.exists():
         try:
-            pipeline_data = json.loads(pipeline_path.read_text(encoding="utf-8"))
+            pipeline_data = json.loads(
+                pipeline_path.read_text(encoding="utf-8")
+            )
+
             if isinstance(pipeline_data, list):
-                pipeline = pipeline_data
+                pipeline_stages = pipeline_data
+
             elif isinstance(pipeline_data, dict):
-                pipeline = pipeline_data.get("pipeline_stages", [])
-        except Exception:
-            pipeline = []
+
+                def describe_metrics(metrics):
+                    if not isinstance(metrics, dict):
+                        return str(metrics)
+
+                    return " | ".join(
+                        f"{key}: {value}"
+                        for key, value in metrics.items()
+                    )
+
+                stage_definitions = [
+                    (
+                        "Raw Input",
+                        "raw_input",
+                        "Input artifact recorded by the pipeline.",
+                    ),
+                    (
+                        "Normalization",
+                        "normalized_rows",
+                        "Number of rows produced by normalization.",
+                    ),
+                    (
+                        "Validation",
+                        "validation",
+                        describe_metrics(pipeline_data.get("validation", {})),
+                    ),
+                    (
+                        "Deduplication",
+                        "deduplication",
+                        describe_metrics(pipeline_data.get("deduplication", {})),
+                    ),
+                    (
+                        "Cleaning",
+                        "cleaning",
+                        describe_metrics(pipeline_data.get("cleaning", {})),
+                    ),
+                    (
+                        "Final Clean Dataset",
+                        "final_clean_rows",
+                        "Final row count recorded in the pipeline report.",
+                    ),
+                    (
+                        "Output Artifacts",
+                        "output_files",
+                        "Files recorded by the pipeline report.",
+                    ),
+                ]
+
+                for number, (stage_name, key, fallback) in enumerate(
+                    stage_definitions, start=1
+                ):
+                    value = pipeline_data.get(key)
+
+                    if value is None:
+                        continue
+
+                    if key == "validation":
+                        description = describe_metrics(value)
+                    elif key == "deduplication":
+                        description = describe_metrics(value)
+                    elif key == "cleaning":
+                        description = describe_metrics(value)
+                    elif key == "output_files":
+                        description = describe_metrics(value)
+                    elif key == "raw_input":
+                        description = f"Source: {value}"
+                    elif key in ("normalized_rows", "final_clean_rows"):
+                        description = f"{int(value):,} rows"
+                    else:
+                        description = fallback
+
+                    pipeline_stages.append({
+                        "number": number,
+                        "stage": stage_name,
+                        "description": description,
+                        "status": "Implemented",
+                    })
+
+                provenance_table.append({
+                    "metric": "Raw input",
+                    "value": str(pipeline_data.get("raw_input", "Not recorded")),
+                })
+
+                for key, label in [
+                    ("normalized_rows", "Normalized rows"),
+                    ("final_clean_rows", "Final clean rows"),
+                ]:
+                    if pipeline_data.get(key) is not None:
+                        provenance_table.append({
+                            "metric": label,
+                            "value": f'{int(pipeline_data[key]):,}',
+                        })
+
+                deduplication = pipeline_data.get("deduplication", {})
+                if isinstance(deduplication, dict):
+                    for key, label in [
+                        ("original_rows", "Rows before deduplication"),
+                        ("duplicate_rows", "Duplicate rows removed"),
+                        ("deduplicated_rows", "Rows after deduplication"),
+                        ("retention_rate_percent", "Deduplication retention (%)"),
+                    ]:
+                        if deduplication.get(key) is not None:
+                            provenance_table.append({
+                                "metric": label,
+                                "value": str(deduplication[key]),
+                            })
+
+                output_files = pipeline_data.get("output_files", {})
+                if isinstance(output_files, dict):
+                    for name, file_path in output_files.items():
+                        provenance_table.append({
+                            "metric": f"Output artifact: {name}",
+                            "value": str(file_path),
+                        })
+
+        except (OSError, ValueError, TypeError) as exc:
+            pipeline_stages = []
+            provenance_table = [{
+                "metric": "Pipeline report parsing",
+                "value": f"Unavailable: {exc}",
+            }]
 
     return _api_json({
         "gates": gates,
@@ -796,8 +1330,8 @@ def api_dashboard_automation():
         "publication_status": status,
         "latest_audit": latest_audit[0] if latest_audit else {},
         "coverage_table": coverage_latest,
-        "pipeline_stages": pipeline,
-        "provenance_table": [],
+        "pipeline_stages": pipeline_stages,
+        "provenance_table": provenance_table,
         "resilience_policy": [],
     })
 

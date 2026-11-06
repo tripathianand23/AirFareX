@@ -1278,3 +1278,591 @@ html body .app-layout > main.main-wrapper .block-container {
     width: 100% !important;
     max-width: 100% !important;
 }
+
+
+/* ---------------------------------------------------------
+   AirFareX India Route Map — isolated map styles
+   --------------------------------------------------------- */
+
+.afx-map-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.afx-map-route-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 230px;
+}
+
+.afx-map-route-control label {
+    color: #344257;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.afx-map-route-control select {
+    min-width: 230px;
+}
+
+.afx-map-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0;
+}
+
+.afx-map-stat {
+    min-width: 0;
+    padding: 0.9rem 1rem;
+    border: 1px solid #dfe5ec;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.afx-map-stat-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.afx-map-stat strong {
+    display: block;
+    overflow-wrap: anywhere;
+    color: #263440;
+    font-size: 1.08rem;
+}
+
+.afx-map-shell {
+    overflow: hidden;
+    border: 1px solid #34414c;
+    border-radius: 12px;
+    background: #18232d;
+}
+
+#afx-india-route-map {
+    width: 100%;
+    height: 680px;
+    min-height: 520px;
+    background: #18232d;
+    z-index: 1;
+}
+
+#afx-india-route-map .leaflet-control-zoom a {
+    color: #263440;
+}
+
+#afx-india-route-map .leaflet-control-attribution {
+    background: rgba(19, 30, 40, 0.88);
+    color: #d6dde3;
+}
+
+#afx-india-route-map .leaflet-control-attribution a {
+    color: #D8C3A5;
+}
+
+.afx-map-airport-label {
+    border: 1px solid #D8C3A5 !important;
+    border-radius: 4px !important;
+    background: rgba(19, 30, 40, 0.94) !important;
+    box-shadow: none !important;
+    color: #F2E7D5 !important;
+    font-size: 10px !important;
+    font-weight: 700;
+}
+
+.afx-map-airport-label::before {
+    display: none !important;
+}
+
+.afx-map-route-tooltip,
+.afx-map-state-tooltip,
+.afx-map-river-tooltip {
+    border: 1px solid #657785 !important;
+    border-radius: 5px !important;
+    background: #18232d !important;
+    box-shadow: none !important;
+    color: #edf1f4 !important;
+    font-size: 11px;
+}
+
+.afx-map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.85rem 1.4rem;
+    padding: 0.9rem 0.2rem;
+    color: #48576a;
+    font-size: 0.8rem;
+}
+
+.afx-map-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.afx-legend-line {
+    display: inline-block;
+    width: 27px;
+    height: 0;
+    border-top: 3px solid;
+}
+
+.afx-legend-selected {
+    border-color: #D8C3A5;
+}
+
+.afx-legend-other {
+    border-color: #659BB8;
+    border-top-style: dashed;
+}
+
+.afx-legend-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border: 2px solid #D8C3A5;
+    border-radius: 50%;
+    background: #F2E7D5;
+}
+
+.afx-legend-river {
+    display: inline-block;
+    width: 27px;
+    height: 0;
+    border-top: 2px solid #8295A0;
+}
+
+.afx-legend-boundary {
+    display: inline-block;
+    width: 27px;
+    height: 0;
+    border-top: 1px solid #C9BBA8;
+}
+
+.afx-map-detail {
+    padding: 0.9rem 1rem;
+    border: 1px solid #dfe5ec;
+    border-radius: 9px;
+    background: #fff;
+    color: #344257;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.afx-map-attribution {
+    margin-top: 0.8rem;
+    line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+    .afx-map-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #afx-india-route-map {
+        height: 540px;
+        min-height: 440px;
+    }
+
+    .afx-map-route-control,
+    .afx-map-route-control select {
+        width: 100%;
+    }
+}
+
+
+/* India Route Map — official outline and route intelligence panel */
+
+.afx-map-shell {
+    background: #18232d;
+    border: 1px solid #34414c;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+#afx-india-route-map {
+    width: 100%;
+    height: 720px;
+    min-height: 560px;
+    background: #18232d;
+    z-index: 1;
+}
+
+#afx-india-route-map .leaflet-control-attribution {
+    background: rgba(19, 30, 40, 0.9);
+    color: #d6dde3;
+}
+
+#afx-india-route-map .leaflet-control-attribution a {
+    color: #D8C3A5;
+}
+
+.afx-map-loc-tooltip {
+    border: 1px solid #D69B70 !important;
+    border-radius: 5px !important;
+    background: #18232d !important;
+    color: #F2E7D5 !important;
+    box-shadow: none !important;
+}
+
+.afx-legend-outline,
+.afx-legend-loc {
+    display: inline-block;
+    width: 27px;
+    height: 0;
+}
+
+.afx-legend-outline {
+    border-top: 3px solid #E4D6C3;
+}
+
+.afx-legend-loc {
+    border-top: 2px dotted #D69B70;
+}
+
+.afx-plane-marker-wrap {
+    background: transparent;
+    border: 0;
+}
+
+.afx-plane-glyph {
+    display: flex;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    color: #F5E7CF;
+    font-size: 25px;
+    line-height: 1;
+    transform-origin: center center;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
+    text-shadow: 0 1px 3px #111;
+    will-change: transform;
+}
+
+.afx-route-detail-panel {
+    margin-top: 1.2rem;
+    padding: 1.2rem;
+    border: 1px solid #dfe5ec;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.afx-route-detail-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.afx-route-detail-heading h3 {
+    margin: 0.25rem 0;
+    color: #263440;
+    font-size: 1.35rem;
+}
+
+.afx-route-detail-heading p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.afx-route-detail-eyebrow {
+    color: #8a765b;
+    font-size: 0.68rem;
+    letter-spacing: 0.13em;
+    font-weight: 700;
+}
+
+.afx-route-detail-date {
+    padding: 0.42rem 0.7rem;
+    border: 1px solid #e2d8c9;
+    border-radius: 6px;
+    color: #665743;
+    background: #faf7f2;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.afx-airport-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 0.7rem;
+    margin: 1rem 0;
+}
+
+.afx-airport-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.32rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid #e2e7ec;
+    border-radius: 9px;
+    background: #fbfcfd;
+}
+
+.afx-detail-label {
+    color: #82909d;
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.afx-airport-card strong {
+    color: #263440;
+    font-size: 1.25rem;
+}
+
+.afx-airport-card span:not(.afx-detail-label) {
+    color: #435365;
+    font-size: 0.83rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.afx-airport-card small {
+    color: #82909d;
+    font-size: 0.72rem;
+}
+
+.afx-airport-direction {
+    color: #B39A77;
+    font-size: 1.8rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.afx-detail-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin: 1rem 0 1.4rem;
+}
+
+.afx-detail-metric {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid #e2e7ec;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.afx-detail-metric span {
+    color: #758393;
+    font-size: 0.73rem;
+    font-weight: 600;
+}
+
+.afx-detail-metric strong {
+    color: #263440;
+    font-size: 1.06rem;
+    overflow-wrap: anywhere;
+}
+
+.afx-route-detail-panel .st-heading {
+    margin-top: 1.4rem;
+}
+
+.afx-map-summary .afx-map-stat {
+    background: #fff;
+}
+
+@media (max-width: 850px) {
+    .afx-detail-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #afx-india-route-map {
+        height: 620px;
+        min-height: 480px;
+    }
+}
+
+@media (max-width: 560px) {
+    .afx-airport-pair {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .afx-airport-direction {
+        transform: rotate(90deg);
+        font-size: 1.4rem;
+    }
+
+    .afx-detail-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .afx-route-detail-panel {
+        padding: 0.8rem;
+    }
+
+    #afx-india-route-map {
+        height: 520px;
+        min-height: 430px;
+    }
+}
+
+/* AirFareX India route map — visual hierarchy refinements */
+.afx-map-shell {
+    border: 1px solid #465968;
+    border-radius: 14px;
+    background: #18232d;
+    box-shadow: 0 12px 32px rgba(21, 34, 45, 0.13);
+}
+
+#afx-india-route-map {
+    width: 100%;
+    height: 760px;
+    min-height: 660px;
+    background: #18232d;
+}
+
+#afx-india-route-map .leaflet-control-zoom a {
+    width: 36px;
+    height: 36px;
+    line-height: 34px;
+    border-color: #506170;
+    background: #F4EEE5;
+    color: #263440;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.afx-map-airport-label {
+    padding: 3px 6px !important;
+    border: 1px solid #E4D0B1 !important;
+    border-radius: 5px !important;
+    background: rgba(19, 30, 40, 0.97) !important;
+    color: #FFF3E1 !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.025em;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28) !important;
+}
+
+.afx-map-route-tooltip {
+    border-color: #D8C3A5 !important;
+    background: #18232d !important;
+    color: #FFF3E1 !important;
+    font-size: 12px !important;
+    font-weight: 700;
+}
+
+.afx-plane-glyph {
+    color: #FFF0D5;
+    font-size: 29px;
+    filter: drop-shadow(0 0 5px rgba(240, 214, 172, 0.8))
+            drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9));
+}
+
+@media (max-width: 760px) {
+    #afx-india-route-map {
+        height: 620px;
+        min-height: 540px;
+    }
+}
+
+/* Prominent route-selection control */
+.afx-map-route-control {
+    display: flex;
+    flex: 0 0 350px;
+    flex-direction: column;
+    gap: 8px;
+    width: 350px;
+    max-width: 100%;
+    padding: 15px 16px;
+    border: 1px solid #D8C3A5;
+    border-left: 5px solid #B89462;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #FFFDF9 0%, #F5EBDD 100%);
+    box-shadow: 0 5px 18px rgba(62, 51, 37, 0.12);
+}
+
+.afx-route-select-kicker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #85663F;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+
+.afx-route-select-indicator {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 9px;
+    border-radius: 50%;
+    background: #B58B52;
+    box-shadow: 0 0 0 4px rgba(181, 139, 82, 0.16);
+}
+
+.afx-map-route-control label {
+    margin: 1px 0 0;
+    color: #263440;
+    font-size: 0.94rem;
+    font-weight: 800;
+}
+
+#afx-map-route-select {
+    width: 100%;
+    min-height: 49px;
+    padding: 0.7rem 2.5rem 0.7rem 0.9rem;
+    border: 1.7px solid #B89462;
+    border-radius: 7px;
+    background-color: #FFFFFF;
+    color: #263440;
+    font-size: 1rem;
+    font-weight: 750;
+    box-shadow: 0 2px 6px rgba(38, 52, 64, 0.08);
+    cursor: pointer;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+#afx-map-route-select:hover {
+    border-color: #89683F;
+    box-shadow: 0 3px 11px rgba(137, 104, 63, 0.16);
+}
+
+#afx-map-route-select:focus {
+    outline: 3px solid rgba(184, 148, 98, 0.24);
+    outline-offset: 2px;
+    border-color: #89683F;
+}
+
+.afx-route-select-hint {
+    color: #667585;
+    font-size: 0.73rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+    .afx-map-route-control {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+/* Keep the route selector below the map heading */
+.afx-map-route-control {
+    margin: 1rem 0 1.25rem;
+    align-self: flex-start;
+}
