@@ -1866,3 +1866,173 @@ html body .app-layout > main.main-wrapper .block-container {
     margin: 1rem 0 1.25rem;
     align-self: flex-start;
 }
+
+
+
+/* =========================================================
+   AIRFAREX — LATEST AUDIT SUMMARY CARD
+   ========================================================= */
+
+.audit-summary-card {
+    background: #ffffff;
+    border: 1px solid #dfe5ec;
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin: 0.65rem 0 1.2rem;
+    box-shadow: 0 3px 14px rgba(20, 38, 60, 0.045);
+}
+
+.audit-summary-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-bottom: 1rem;
+}
+
+.audit-summary-eyebrow {
+    color: #718096;
+    font-size: 0.70rem;
+    font-weight: 750;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.35rem;
+}
+
+.audit-summary-date {
+    color: #172b46;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.audit-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 30px;
+    padding: 0.48rem 0.85rem;
+    font-size: 0.76rem;
+    font-weight: 750;
+    letter-spacing: 0.045em;
+}
+
+.audit-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.audit-status-publishable {
+    color: #147d50;
+    background: #e9f7ef;
+    border: 1px solid #c8ead5;
+}
+
+.audit-status-hold {
+    color: #a56508;
+    background: #fff5df;
+    border: 1px solid #f0dfb5;
+}
+
+.audit-status-unavailable {
+    color: #64748b;
+    background: #f1f5f9;
+    border: 1px solid #dfe5ec;
+}
+
+.audit-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.8rem;
+    padding: 1rem 0;
+    border-top: 1px solid #edf0f4;
+    border-bottom: 1px solid #edf0f4;
+}
+
+.audit-summary-metric {
+    min-width: 0;
+    padding: 0.8rem;
+    background: #f8fafc;
+    border: 1px solid #edf0f4;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.55rem;
+}
+
+.audit-summary-label {
+    color: #718096;
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.audit-summary-value {
+    color: #172b46;
+    font-size: clamp(1.2rem, 2vw, 1.75rem);
+    font-weight: 750;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+.audit-summary-value.audit-positive {
+    color: #168853;
+}
+
+.audit-summary-value.audit-negative {
+    color: #d9383a;
+}
+
+.audit-full-details {
+    margin-top: 1rem;
+}
+
+.audit-full-details summary {
+    color: #315d91;
+    font-size: 0.84rem;
+    font-weight: 650;
+    cursor: pointer;
+    padding: 0.4rem 0;
+}
+
+.audit-full-details summary:hover {
+    color: #173f70;
+}
+
+.audit-full-details pre {
+    background: #f8fafc;
+    border: 1px solid #e5eaf0;
+    border-radius: 9px;
+    padding: 1rem;
+    margin-top: 0.65rem;
+    color: #334155;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 380px;
+    overflow: auto;
+}
+
+@media (max-width: 850px) {
+    .audit-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .audit-summary-card {
+        padding: 0.85rem;
+    }
+
+    .audit-summary-grid {
+        gap: 0.55rem;
+    }
+
+    .audit-summary-metric {
+        padding: 0.7rem;
+    }
+}

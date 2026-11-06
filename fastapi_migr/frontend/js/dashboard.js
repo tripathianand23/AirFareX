@@ -870,8 +870,118 @@ async function loadAutomationTab() {
             pubBanner.innerHTML = "<span>⚪</span><span><b>LATEST INDEX: AUDIT STATUS UNAVAILABLE.</b></span>";
         }
 
-        // Latest audit JSON view
-        document.getElementById("auto-audit-json").textContent = JSON.stringify(data.latest_audit || {}, null, 2);
+        // Latest audit summary card — values come directly from the audit API.
+        const audit = data.latest_audit || {};
+        const auditContainer = document.getElementById("auto-audit-json");
+
+        const escapeAuditHtml = (value) => String(value ?? "—").replace(
+            /[&<>"']/g,
+            char => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            })[char]
+        );
+
+        const auditNumber = (key) => {
+            const value = Number(audit[key]);
+            return audit[key] !== null && audit[key] !== undefined && Number.isFinite(value)
+                ? value
+                : null;
+        };
+
+        const formatAuditDate = (value) => {
+            if (!value) return "Date unavailable";
+            const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (!match) return escapeAuditHtml(value);
+
+            const date = new Date(
+                Number(match[1]),
+                Number(match[2]) - 1,
+                Number(match[3])
+            );
+
+            return date.toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric"
+            });
+        };
+
+        const observations = auditNumber("observations");
+        const nationalIndex = auditNumber("national_index");
+        const movement = auditNumber("movement_from_base_pct");
+        const routes = auditNumber("routes_present");
+        const expectedRoutes = auditNumber("expected_routes");
+
+        const status = String(
+            data.publication_status || audit.publication_status || "UNAVAILABLE"
+        ).toUpperCase();
+
+        const statusClass = status === "PUBLISHABLE"
+            ? "audit-status-publishable"
+            : status === "HOLD"
+                ? "audit-status-hold"
+                : "audit-status-unavailable";
+
+        const movementClass = movement === null
+            ? ""
+            : movement >= 0
+                ? "audit-positive"
+                : "audit-negative";
+
+        const metric = (label, value, extraClass = "") => `
+            <div class="audit-summary-metric">
+                <span class="audit-summary-label">${label}</span>
+                <strong class="audit-summary-value ${extraClass}">${value}</strong>
+            </div>
+        `;
+
+        auditContainer.innerHTML = `
+            <div class="audit-summary-card">
+                <div class="audit-summary-header">
+                    <div>
+                        <div class="audit-summary-eyebrow">LATEST VERIFIED AUDIT</div>
+                        <div class="audit-summary-date">
+                            ${formatAuditDate(audit.collection_date)}
+                        </div>
+                    </div>
+                    <span class="audit-status-pill ${statusClass}">
+                        <span class="audit-status-dot"></span>
+                        ${escapeAuditHtml(status)}
+                    </span>
+                </div>
+
+                <div class="audit-summary-grid">
+                    ${metric(
+                        "Observations",
+                        observations === null ? "—" : observations.toLocaleString("en-IN")
+                    )}
+                    ${metric(
+                        "National Airfare Index",
+                        nationalIndex === null ? "—" : nationalIndex.toFixed(2)
+                    )}
+                    ${metric(
+                        "Movement from Base Period",
+                        movement === null ? "—" : `${movement >= 0 ? "+" : ""}${movement.toFixed(2)}%`,
+                        movementClass
+                    )}
+                    ${metric(
+                        "Route Coverage",
+                        routes === null || expectedRoutes === null
+                            ? "—"
+                            : `${routes.toLocaleString("en-IN")} / ${expectedRoutes.toLocaleString("en-IN")}`
+                    )}
+                </div>
+
+                <details class="audit-full-details">
+                    <summary>View Full Audit Details</summary>
+                    <pre>${escapeAuditHtml(JSON.stringify(audit, null, 2))}</pre>
+                </details>
+            </div>
+        `;
 
         // Coverage Gate Table
         renderTable("auto-coverage-table", data.coverage_table);
