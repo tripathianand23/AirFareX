@@ -6,6 +6,10 @@ on:
     - cron: "30 2 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: daily-airfare-pipeline
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -135,4 +139,6 @@ jobs:
       - name: Push updated index artifacts
         if: steps.fetch.outputs.skip_pipeline != 'true'
         run: |
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
