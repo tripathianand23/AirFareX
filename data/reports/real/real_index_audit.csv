@@ -74,4 +74,5 @@ collection_date,observations,routes_present,expected_routes,observed_strata,requ
 2026-11-15,54979,20,20,100,100,True,True,True,True,True,True,True,426.52596533806803,2.1897425510399984,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
 2026-11-16,54854,20,20,100,100,True,True,True,True,True,True,True,406.7811315251787,-4.62922199759619,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
 2026-11-17,55884,20,20,100,100,True,True,True,True,True,True,True,422.1583626254353,3.780222313311711,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
-2026-11-18,40768,20,20,100,100,True,True,True,True,True,True,True,457.55616791338673,8.384958921057432,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-11-18,53738,20,20,100,100,True,True,True,True,True,True,True,466.0150399413329,10.388679035788726,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
+2026-11-19,56184,20,20,100,100,True,True,True,True,True,True,True,481.87793493335937,3.4039448585229053,PUBLISHABLE,(),"('validated_duplicate_flags_present_before_deduplication',)"
