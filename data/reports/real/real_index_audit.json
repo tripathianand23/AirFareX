@@ -1806,7 +1806,7 @@
     },
     {
       "collection_date": "2026-11-26",
-      "observations": 53203,
+      "observations": 59378,
       "routes_present": 20,
       "expected_routes": 20,
       "observed_strata": 100,
@@ -1818,8 +1818,52 @@
       "index_calculation_pass": true,
       "contribution_reconciliation_pass": true,
       "base_period_pass": true,
-      "national_index": 521.8966083641222,
-      "movement_from_base_pct": 6.8953439783417,
+      "national_index": 519.43089723779,
+      "movement_from_base_pct": 6.39031475459052,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": [
+        "validated_duplicate_flags_present_before_deduplication"
+      ]
+    },
+    {
+      "collection_date": "2026-11-27",
+      "observations": 57987,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 497.6456662019045,
+      "movement_from_base_pct": -4.194057602605881,
+      "publication_status": "PUBLISHABLE",
+      "failed_checks": [],
+      "warnings": [
+        "validated_duplicate_flags_present_before_deduplication"
+      ]
+    },
+    {
+      "collection_date": "2026-11-28",
+      "observations": 52547,
+      "routes_present": 20,
+      "expected_routes": 20,
+      "observed_strata": 100,
+      "required_strata": 100,
+      "coverage_complete": true,
+      "structural_validation_pass": true,
+      "duplicate_qc_pass": true,
+      "representative_fares_pass": true,
+      "index_calculation_pass": true,
+      "contribution_reconciliation_pass": true,
+      "base_period_pass": true,
+      "national_index": 500.07759047615053,
+      "movement_from_base_pct": 0.48868591437896214,
       "publication_status": "PUBLISHABLE",
       "failed_checks": [],
       "warnings": [
